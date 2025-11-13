@@ -2,7 +2,23 @@
 
 import { useState } from 'react';
 
-// Simple SHA-256 hash function
+// Supabase client
+const getSupabaseClient = () => {
+  if (typeof window === 'undefined') return null;
+  
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('Supabase environment variables not set');
+    return null;
+  }
+  
+  const { createClient } = require('@supabase/supabase-js');
+  return createClient(supabaseUrl, supabaseKey);
+};
+
+// Hash generation functions
 const generateSHA256Hash = async (file: File): Promise<string> => {
   const arrayBuffer = await file.arrayBuffer();
   const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
@@ -10,7 +26,6 @@ const generateSHA256Hash = async (file: File): Promise<string> => {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-// Simple content hash (using file properties + first bytes)
 const generateContentHash = async (file: File): Promise<string> => {
   const arrayBuffer = await file.arrayBuffer();
   const firstBytes = new Uint8Array(arrayBuffer.slice(0, 100));
@@ -22,7 +37,6 @@ const generateContentHash = async (file: File): Promise<string> => {
   return '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
 };
 
-// Floral hash simulation
 const generateFloralHash = async (file: File): Promise<string> => {
   const baseHash = await generateSHA256Hash(file);
   return '0xFLORAL' + baseHash.slice(0, 8);
@@ -32,6 +46,7 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>('');
   const [hashes, setHashes] = useState<{legal: string, content: string, floral: string} | null>(null);
+  const [supabaseRecord, setSupabaseRecord] = useState<any>(null);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -39,28 +54,70 @@ export default function Home() {
       setSelectedFile(file);
       setUploadStatus('');
       setHashes(null);
+      setSupabaseRecord(null);
     }
   };
 
   const handleUpload = async () => {
     if (!selectedFile) return;
     
-    setUploadStatus('Generating legal hash (SHA-256)...');
-    const legalHash = await generateSHA256Hash(selectedFile);
-    
-    setUploadStatus('Generating content hash...');
-    const contentHash = await generateContentHash(selectedFile);
-    
-    setUploadStatus('Generating floral hash...');
-    const floralHash = await generateFloralHash(selectedFile);
-    
-    setHashes({
-      legal: legalHash,
-      content: contentHash,
-      floral: floralHash
-    });
-    
-    setUploadStatus('✅ All hashes generated successfully! Ready for Supabase storage.');
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setUploadStatus('❌ Supabase not configured. Check environment variables.');
+      return;
+    }
+
+    try {
+      // Step 1: Generate hashes
+      setUploadStatus('Generating legal hash (SHA-256)...');
+      const legalHash = await generateSHA256Hash(selectedFile);
+      
+      setUploadStatus('Generating content hash...');
+      const contentHash = await generateContentHash(selectedFile);
+      
+      setUploadStatus('Generating floral hash...');
+      const floralHash = await generateFloralHash(selectedFile);
+
+      // Step 2: Upload file to Supabase Storage
+      setUploadStatus('Uploading file to secure storage...');
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${legalHash.slice(0, 16)}.${fileExt}`;
+      
+      const { data: fileData, error: uploadError } = await supabase.storage
+        .from('protected-files')
+        .upload(fileName, selectedFile);
+
+      if (uploadError) throw uploadError;
+
+      // Step 3: Save hash record to database
+      setUploadStatus('Saving protection record...');
+      const recordData = {
+        file_name: selectedFile.name,
+        file_size: selectedFile.size,
+        file_type: selectedFile.type,
+        legal_hash: legalHash,
+        content_hash: contentHash,
+        floral_hash: floralHash,
+        storage_path: fileData?.path
+      };
+
+      const { data: record, error: dbError } = await supabase
+        .from('protected_files')
+        .insert(recordData)
+        .select()
+        .single();
+
+      if (dbError) throw dbError;
+
+      // Success!
+      setHashes({ legal: legalHash, content: contentHash, floral: floralHash });
+      setSupabaseRecord(record);
+      setUploadStatus('✅ File protected and stored successfully! Ready for blockchain.');
+
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      setUploadStatus(`❌ Error: ${error.message}`);
+    }
   };
 
   return (
@@ -68,6 +125,7 @@ export default function Home() {
       <h1>🌼 BloomShield Prototype</h1>
       <p>Upload your file to generate protection hashes</p>
       
+      {/* File Upload Section */}
       <div style={{ border: '2px dashed #ccc', padding: '40px', textAlign: 'center', margin: '20px 0', borderRadius: '10px' }}>
         <input
           type="file"
@@ -97,11 +155,14 @@ export default function Home() {
         </button>
       </div>
 
+      {/* Status Message */}
       {uploadStatus && (
         <div style={{ 
           padding: '10px', 
-          backgroundColor: uploadStatus.includes('✅') ? '#f0fff0' : '#f0f8ff', 
-          border: uploadStatus.includes('✅') ? '1px solid #00a000' : '1px solid #0070f3',
+          backgroundColor: uploadStatus.includes('✅') ? '#f0fff0' : 
+                         uploadStatus.includes('❌') ? '#fff0f0' : '#f0f8ff', 
+          border: uploadStatus.includes('✅') ? '1px solid #00a000' : 
+                 uploadStatus.includes('❌') ? '1px solid #ff0000' : '1px solid #0070f3',
           borderRadius: '5px',
           margin: '10px 0'
         }}>
@@ -109,6 +170,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* Hash Display */}
       {hashes && (
         <div style={{ marginTop: '30px' }}>
           <h3>✅ Your File is Protected!</h3>
@@ -127,9 +189,17 @@ export default function Home() {
             <p><strong>Floral Hash (Visual):</strong> 
               <br /><code style={{ fontSize: '12px', wordBreak: 'break-all' }}>{hashes.floral}</code>
             </p>
+            
+            {supabaseRecord && (
+              <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #ddd' }}>
+                <p style={{ color: '#00a000', fontSize: '14px' }}>
+                  <strong>📁 Stored in Supabase:</strong> Record #{supabaseRecord.id}
+                </p>
+              </div>
+            )}
           </div>
           <p style={{ fontSize: '14px', color: '#666', marginTop: '10px' }}>
-            Next: We'll store these hashes in Supabase
+            Next: We'll add blockchain timestamping for permanent proof
           </p>
         </div>
       )}
