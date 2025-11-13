@@ -1,12 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useSDK } from "@thirdweb-dev/react";
-
-// 🚨 SECURITY NOTE: Using service_role key to bypass RLS for prototyping
-// TODO: Replace with proper RLS policies before production
-// Current setup allows full database access - not secure for user data
-// RLS Policies needed: Authenticated users only for INSERT/UPDATE/DELETE
 
 // Supabase client
 const getSupabaseClient = () => {
@@ -54,8 +48,6 @@ export default function Home() {
   const [hashes, setHashes] = useState<{legal: string, content: string, floral: string} | null>(null);
   const [supabaseRecord, setSupabaseRecord] = useState<any>(null);
   const [blockchainTx, setBlockchainTx] = useState<string | null>(null);
-  
-  const sdk = useSDK();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -88,7 +80,7 @@ export default function Home() {
       setUploadStatus('Generating floral hash...');
       const floralHash = await generateFloralHash(selectedFile);
 
-      // Step 2: Store on Blockchain (using the new service)
+      // Step 2: Store on Blockchain (SERVER-SIDE - NO CSP!)
       setUploadStatus('Creating blockchain timestamp on Polygon...');
       
       // Import and use the blockchain service
