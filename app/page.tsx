@@ -1,23 +1,29 @@
 'use client';
 
 import { useState, useRef } from 'react';
-// Use your existing Supabase client setup
-const getSupabaseClient = () => {
-  if (typeof window === 'undefined') return null;
-  
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  
-  if (!supabaseUrl || !supabaseKey) {
-    console.error('Supabase environment variables not set');
-    return null;
-  }
-  
-  const { createClient } = require('@supabase/supabase-js');
-  return createClient(supabaseUrl, supabaseKey);
-};
 
 export default function Home() {
+  // Supabase client - MOVED INSIDE COMPONENT
+  const getSupabaseClient = () => {
+    if (typeof window === 'undefined') return null;
+    
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Supabase environment variables not set');
+      return null;
+    }
+    
+    try {
+      const { createClient } = require('@supabase/supabase-js');
+      return createClient(supabaseUrl, supabaseKey);
+    } catch (error) {
+      console.error('Failed to create Supabase client:', error);
+      return null;
+    }
+  };
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>('');
   const [legalHash, setLegalHash] = useState<string>('');
@@ -28,21 +34,27 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const generateHashes = async (file: File) => {
-    const arrayBuffer = await file.arrayBuffer();
-    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const legal = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const legal = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-    const uint8Array = new Uint8Array(arrayBuffer);
-    let simpleSum = 0;
-    for (let i = 0; i < Math.min(uint8Array.length, 1000); i++) {
-      simpleSum += uint8Array[i];
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let simpleSum = 0;
+      for (let i = 0; i < Math.min(uint8Array.length, 1000); i++) {
+        simpleSum += uint8Array[i];
+      }
+      // Use a smaller number to avoid BigInt issues
+      const content = '0x' + (simpleSum % 10000000000000000).toString(16).padStart(16, '0');
+
+      const floral = '0xFLORAL' + legal.substring(0, 10);
+
+      return { legal, content, floral };
+    } catch (error) {
+      console.error('Hash generation failed:', error);
+      throw new Error('Failed to generate file hashes');
     }
-    const content = '0x' + (simpleSum % 0xFFFFFFFFFFFFFFFF).toString(16).padStart(16, '0');
-
-    const floral = '0xFLORAL' + legal.substring(0, 10);
-
-    return { legal, content, floral };
   };
 
   const handleUpload = async () => {
@@ -64,9 +76,10 @@ export default function Home() {
       // Step 2: TEST BLOCKCHAIN API DIRECTLY
       setUploadStatus('⛓️ Creating blockchain timestamp...');
       console.log('🔗 DEBUG: Starting blockchain API test...');
-      console.log('🔗 DEBUG: Hashes generated:', hashes);
       
-      let blockchainResult = null;
+      let blockchainTransactionHash = '';
+      let blockchainTimestamp = '';
+      
       try {
         console.log('🔗 DEBUG: Making fetch request to /api/blockchain/timestamp');
         const response = await fetch('/api/blockchain/timestamp', {
@@ -83,79 +96,72 @@ export default function Home() {
         });
 
         console.log('📡 DEBUG: Response status:', response.status);
-        console.log('📡 DEBUG: Response ok:', response.ok);
-        
         const result = await response.json();
         console.log('📦 DEBUG: Full API response:', result);
 
         if (response.ok && result.success) {
-          blockchainResult = result.blockchain;
-          setBlockchainTx(blockchainResult.transactionHash);
-          console.log('✅ DEBUG: Blockchain timestamp created!', blockchainResult);
+          blockchainTransactionHash = result.blockchain.transactionHash;
+          blockchainTimestamp = new Date(result.blockchain.timestamp).toISOString();
+          setBlockchainTx(blockchainTransactionHash);
+          console.log('✅ DEBUG: Blockchain timestamp created!');
         } else {
-          console.error('❌ DEBUG: Blockchain API failed:', result.error);
           throw new Error(result.error || 'Blockchain API failed');
         }
       } catch (blockchainError) {
-        console.error('❌ DEBUG: Blockchain call failed completely:', blockchainError);
+        console.error('❌ DEBUG: Blockchain call failed:', blockchainError);
         // Fallback to simulated transaction
-        const simulatedTx = `0xSIM${Math.random().toString(16).substr(2, 60)}`;
-        setBlockchainTx(simulatedTx);
-        console.log('⚠️ DEBUG: Using simulated transaction:', simulatedTx);
+        blockchainTransactionHash = `0xSIM${Math.random().toString(16).substr(2, 60)}`;
+        blockchainTimestamp = new Date().toISOString();
+        setBlockchainTx(blockchainTransactionHash);
       }
 
       // Step 3: Upload to Supabase Storage
       setUploadStatus('Uploading to secure storage...');
-      const fileName = `${Date.now()}_${selectedFile.name}`;
-      console.log('📁 DEBUG: Uploading file:', fileName);
-      
+      // Use hash + timestamp to avoid collisions
+      const fileName = `${hashes.legal.slice(0, 16)}_${Date.now()}_${selectedFile.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('protected-files')
         .upload(fileName, selectedFile);
 
       if (uploadError) {
-        console.error('❌ DEBUG: Storage upload failed:', uploadError);
-        throw uploadError;
+        if (uploadError.message.includes('already exists')) {
+          // File already exists, that's okay - continue with existing file
+          console.log('⚠️ DEBUG: File already exists in storage, continuing...');
+        } else {
+          throw uploadError;
+        }
       }
-      console.log('✅ DEBUG: File uploaded successfully:', uploadData);
 
-      // Step 4: Save to Database (with blockchain data!)
+      // Step 4: Save to Database
       setUploadStatus('Saving protection record...');
-      const recordData = {
-        file_name: selectedFile.name,
-        file_size: selectedFile.size,
-        mime_type: selectedFile.type,
-        storage_path: uploadData.path,
-        legal_hash: hashes.legal,
-        content_hash: hashes.content,
-        floral_hash: hashes.floral,
-        blockchain_tx: blockchainTx || blockchainResult?.transactionHash,
-        blockchain_timestamp: blockchainResult 
-          ? new Date(blockchainResult.timestamp).toISOString() 
-          : new Date().toISOString(),
-      };
-      
-      console.log('💾 DEBUG: Saving to database:', recordData);
-
       const { data: dbData, error: dbError } = await supabase
         .from('protected_files')
-        .insert(recordData)
+        .insert({
+          file_name: selectedFile.name,
+          file_size: selectedFile.size,
+          mime_type: selectedFile.type,
+          storage_path: uploadData?.path || fileName,
+          legal_hash: hashes.legal,
+          content_hash: hashes.content,
+          floral_hash: hashes.floral,
+          blockchain_tx: blockchainTransactionHash,
+          blockchain_timestamp: blockchainTimestamp,
+        })
         .select()
         .single();
 
-      if (dbError) {
-        console.error('❌ DEBUG: Database save failed:', dbError);
-        throw dbError;
-      }
+      if (dbError) throw dbError;
 
       setRecordId(dbData.id);
-      console.log('✅ DEBUG: Database record saved:', dbData);
       
-      setUploadStatus('✅ File protected and stored successfully! ' + 
-        (blockchainResult ? '⛓️ Blockchain timestamp created!' : '⚠️ Using simulated blockchain.'));
+      const successMessage = blockchainTransactionHash.startsWith('0xSIM') 
+        ? '✅ File protected successfully! ⚠️ Using simulated blockchain.'
+        : '✅ File protected and stored successfully! ⛓️ Blockchain timestamp created!';
+      
+      setUploadStatus(successMessage);
 
     } catch (error) {
-      console.error('❌ DEBUG: Overall upload failed:', error);
+      console.error('Upload error:', error);
       setUploadStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
@@ -176,6 +182,7 @@ export default function Home() {
                 ref={fileInputRef}
                 onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                 className="hidden"
+                key={selectedFile?.name} // Reset input when new file selected
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -199,7 +206,11 @@ export default function Home() {
             </button>
 
             {uploadStatus && (
-              <div className={`p-4 rounded-lg ${uploadStatus.includes('Error') ? 'bg-red-50 text-red-700' : uploadStatus.includes('⛓️') ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
+              <div className={`p-4 rounded-lg ${
+                uploadStatus.includes('Error') ? 'bg-red-50 text-red-700' : 
+                uploadStatus.includes('⛓️') ? 'bg-green-50 text-green-700' : 
+                'bg-blue-50 text-blue-700'
+              }`}>
                 {uploadStatus}
               </div>
             )}
@@ -230,9 +241,6 @@ export default function Home() {
                         {blockchainTx.startsWith('0xSIM') ? '⚠️ Simulated Blockchain TX:' : '⛓️ Blockchain TX:'}
                       </span>
                       <p className="font-mono bg-white p-2 rounded mt-1 break-all">{blockchainTx}</p>
-                      {!blockchainTx.startsWith('0xSIM') && (
-                        <p className="text-xs text-green-600 mt-1">✅ Permanently timestamped on blockchain</p>
-                      )}
                     </div>
                   )}
 
@@ -241,14 +249,6 @@ export default function Home() {
                       📁 Stored in Supabase: Record #{recordId}
                     </p>
                   )}
-                </div>
-
-                <div className="mt-4 p-3 bg-blue-50 rounded border border-blue-200">
-                  <p className="text-xs text-blue-700">
-                    {blockchainTx && !blockchainTx.startsWith('0xSIM') 
-                      ? '✅ Your file is now protected with blockchain proof!'
-                      : '⚠️ Next: Add blockchain API keys to enable real blockchain timestamping'}
-                  </p>
                 </div>
               </div>
             )}
