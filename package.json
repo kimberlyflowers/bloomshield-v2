@@ -1,5 +1,5 @@
 {
-  "name": "bloomshield",
+  "name": "bloomshield-v2",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -14,7 +14,6 @@
     "react-dom": "^18.0.0",
     "@supabase/supabase-js": "^2.38.0",
     "crypto-js": "^4.1.1",
-    "@thirdweb-dev/react": "^5.9.2",
     "@thirdweb-dev/sdk": "^5.9.2"
   },
   "devDependencies": {
