@@ -18,7 +18,7 @@ export default function RootLayout({
       <body>
         <ThirdwebProvider
           activeChain={Polygon}
-          clientId="your-client-id" // We'll get this next
+          clientId="c31c83cc19b0b7b3124743f28b2d3b26" // We'll get this next
         >
           {children}
         </ThirdwebProvider>
