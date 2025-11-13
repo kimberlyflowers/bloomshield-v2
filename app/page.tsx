@@ -61,12 +61,14 @@ export default function Home() {
       setContentHash(hashes.content);
       setFloralHash(hashes.floral);
 
-      // Step 2: CREATE BLOCKCHAIN TIMESTAMP (NEW!)
+      // Step 2: TEST BLOCKCHAIN API DIRECTLY
       setUploadStatus('⛓️ Creating blockchain timestamp...');
+      console.log('🔗 DEBUG: Starting blockchain API test...');
+      console.log('🔗 DEBUG: Hashes generated:', hashes);
       
       let blockchainResult = null;
       try {
-        console.log('🔗 Calling blockchain API...');
+        console.log('🔗 DEBUG: Making fetch request to /api/blockchain/timestamp');
         const response = await fetch('/api/blockchain/timestamp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -80,62 +82,80 @@ export default function Home() {
           }),
         });
 
-        console.log('📡 Blockchain API response status:', response.status);
+        console.log('📡 DEBUG: Response status:', response.status);
+        console.log('📡 DEBUG: Response ok:', response.ok);
+        
         const result = await response.json();
-        console.log('📦 Blockchain API result:', result);
+        console.log('📦 DEBUG: Full API response:', result);
 
         if (response.ok && result.success) {
           blockchainResult = result.blockchain;
           setBlockchainTx(blockchainResult.transactionHash);
-          console.log('✅ Blockchain timestamp created!', blockchainResult);
+          console.log('✅ DEBUG: Blockchain timestamp created!', blockchainResult);
         } else {
+          console.error('❌ DEBUG: Blockchain API failed:', result.error);
           throw new Error(result.error || 'Blockchain API failed');
         }
       } catch (blockchainError) {
-        console.error('❌ Blockchain error:', blockchainError);
+        console.error('❌ DEBUG: Blockchain call failed completely:', blockchainError);
         // Fallback to simulated transaction
         const simulatedTx = `0xSIM${Math.random().toString(16).substr(2, 60)}`;
         setBlockchainTx(simulatedTx);
-        console.log('⚠️ Using simulated transaction:', simulatedTx);
+        console.log('⚠️ DEBUG: Using simulated transaction:', simulatedTx);
       }
 
       // Step 3: Upload to Supabase Storage
       setUploadStatus('Uploading to secure storage...');
       const fileName = `${Date.now()}_${selectedFile.name}`;
+      console.log('📁 DEBUG: Uploading file:', fileName);
+      
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('protected-files')
         .upload(fileName, selectedFile);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('❌ DEBUG: Storage upload failed:', uploadError);
+        throw uploadError;
+      }
+      console.log('✅ DEBUG: File uploaded successfully:', uploadData);
 
       // Step 4: Save to Database (with blockchain data!)
       setUploadStatus('Saving protection record...');
+      const recordData = {
+        file_name: selectedFile.name,
+        file_size: selectedFile.size,
+        mime_type: selectedFile.type,
+        storage_path: uploadData.path,
+        legal_hash: hashes.legal,
+        content_hash: hashes.content,
+        floral_hash: hashes.floral,
+        blockchain_tx: blockchainTx || blockchainResult?.transactionHash,
+        blockchain_timestamp: blockchainResult 
+          ? new Date(blockchainResult.timestamp).toISOString() 
+          : new Date().toISOString(),
+      };
+      
+      console.log('💾 DEBUG: Saving to database:', recordData);
+
       const { data: dbData, error: dbError } = await supabase
         .from('protected_files')
-        .insert({
-          file_name: selectedFile.name,
-          file_size: selectedFile.size,
-          mime_type: selectedFile.type,
-          storage_path: uploadData.path,
-          legal_hash: hashes.legal,
-          content_hash: hashes.content,
-          floral_hash: hashes.floral,
-          blockchain_tx: blockchainTx || blockchainResult?.transactionHash,
-          blockchain_timestamp: blockchainResult 
-            ? new Date(blockchainResult.timestamp).toISOString() 
-            : new Date().toISOString(),
-        })
+        .insert(recordData)
         .select()
         .single();
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('❌ DEBUG: Database save failed:', dbError);
+        throw dbError;
+      }
 
       setRecordId(dbData.id);
+      console.log('✅ DEBUG: Database record saved:', dbData);
+      
       setUploadStatus('✅ File protected and stored successfully! ' + 
         (blockchainResult ? '⛓️ Blockchain timestamp created!' : '⚠️ Using simulated blockchain.'));
 
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('❌ DEBUG: Overall upload failed:', error);
       setUploadStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
