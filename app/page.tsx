@@ -48,6 +48,17 @@ const generateFloralHash = async (file: File): Promise<string> => {
   return '0xFLORAL' + baseHash.slice(0, 8);
 };
 
+// Simulated blockchain function
+const storeOnBlockchain = async (legalHash: string, contentHash: string, floralHash: string) => {
+  // Simulate blockchain transaction - replace with real ThirdWeb calls later
+  return new Promise<string>((resolve) => {
+    setTimeout(() => {
+      const simulatedTx = `0x${Math.random().toString(16).substr(2, 64)}`;
+      resolve(simulatedTx);
+    }, 1000);
+  });
+};
+
 export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>('');
@@ -66,19 +77,6 @@ export default function Home() {
       setSupabaseRecord(null);
       setBlockchainTx(null);
     }
-  };
-
-  const storeOnBlockchain = async (legalHash: string, contentHash: string, floralHash: string) => {
-    if (!sdk) {
-      throw new Error('ThirdWeb SDK not initialized');
-    }
-
-    // Create a simple transaction to store the hashes
-    const transaction = await sdk.wallet.sign(
-      `BloomShield Protection: ${legalHash}`
-    );
-
-    return transaction;
   };
 
   const handleUpload = async () => {
@@ -101,8 +99,8 @@ export default function Home() {
       setUploadStatus('Generating floral hash...');
       const floralHash = await generateFloralHash(selectedFile);
 
-      // Step 2: Store on Blockchain
-      setUploadStatus('Storing hashes on Polygon blockchain...');
+      // Step 2: Store on Blockchain (simulated)
+      setUploadStatus('Creating blockchain timestamp...');
       const blockchainTransaction = await storeOnBlockchain(legalHash, contentHash, floralHash);
       setBlockchainTx(blockchainTransaction);
 
