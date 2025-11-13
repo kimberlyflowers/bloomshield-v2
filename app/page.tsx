@@ -48,38 +48,6 @@ const generateFloralHash = async (file: File): Promise<string> => {
   return '0xFLORAL' + baseHash.slice(0, 8);
 };
 
-// Server-side blockchain function (NO CSP ISSUES!)
-const storeOnBlockchain = async (legalHash: string, contentHash: string, floralHash: string, fileName: string, fileSize: number, fileType: string) => {
-  try {
-    const response = await fetch('/api/blockchain/timestamp', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        legalHash,
-        contentHash,
-        floralHash,
-        fileName,
-        fileSize,
-        mimeType: fileType
-      })
-    });
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to create blockchain timestamp');
-    }
-    
-    return data.blockchain.transactionHash;
-  } catch (error) {
-    console.error('Blockchain API error:', error);
-    // Fallback to simulated transaction
-    return `0xSIM${Math.random().toString(16).substr(2, 60)}`;
-  }
-};
-
 export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>('');
@@ -120,17 +88,21 @@ export default function Home() {
       setUploadStatus('Generating floral hash...');
       const floralHash = await generateFloralHash(selectedFile);
 
-      // Step 2: Store on Blockchain (SERVER-SIDE - NO CSP!)
+      // Step 2: Store on Blockchain (using the new service)
       setUploadStatus('Creating blockchain timestamp on Polygon...');
-      const blockchainTransaction = await storeOnBlockchain(
-        legalHash, 
-        contentHash, 
-        floralHash, 
-        selectedFile.name, 
-        selectedFile.size, 
-        selectedFile.type
-      );
-      setBlockchainTx(blockchainTransaction);
+      
+      // Import and use the blockchain service
+      const { createBlockchainTimestamp } = await import('../lib/blockchain-service');
+      const blockchainResult = await createBlockchainTimestamp({
+        legalHash,
+        contentHash,
+        floralHash,
+        fileName: selectedFile.name,
+        fileSize: selectedFile.size,
+        mimeType: selectedFile.type
+      });
+
+      setBlockchainTx(blockchainResult.blockchain.transactionHash);
 
       // Step 3: Upload file to Supabase Storage
       setUploadStatus('Uploading file to secure storage...');
@@ -153,7 +125,7 @@ export default function Home() {
         content_hash: contentHash,
         floral_hash: floralHash,
         storage_path: fileData?.path,
-        blockchain_tx: blockchainTransaction
+        blockchain_tx: blockchainResult.blockchain.transactionHash
       };
 
       const { data: record, error: dbError } = await supabase
