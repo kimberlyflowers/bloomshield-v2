@@ -2,6 +2,33 @@
 
 import { useState } from 'react';
 
+// Simple SHA-256 hash function
+const generateSHA256Hash = async (file: File): Promise<string> => {
+  const arrayBuffer = await file.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+// Simple content hash (using file properties + first bytes)
+const generateContentHash = async (file: File): Promise<string> => {
+  const arrayBuffer = await file.arrayBuffer();
+  const firstBytes = new Uint8Array(arrayBuffer.slice(0, 100)); // First 100 bytes
+  const properties = `${file.name}-${file.size}-${file.type}-${file.lastModified}`;
+  
+  const combined = properties + Array.from(firstBytes).join('');
+  const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(combined));
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+};
+
+// Floral hash simulation (your unique algorithm placeholder)
+const generateFloralHash = async (file: File): Promise<string> => {
+  // This is where your unique Floral Hash algorithm will go
+  const baseHash = await generateSHA256Hash(file);
+  return '0xFLORAL' + baseHash.slice(0, 8); // Placeholder
+};
+
 export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>('');
@@ -19,17 +46,22 @@ export default function Home() {
   const handleUpload = async () => {
     if (!selectedFile) return;
     
-    setUploadStatus('Generating hashes...');
+    setUploadStatus('Generating legal hash (SHA-256)...');
+    const legalHash = await generateSHA256Hash(selectedFile);
     
-    // Simulate hash generation (we'll implement real hashes next)
-    setTimeout(() => {
-      setHashes({
-        legal: '0x' + Math.random().toString(16).substr(2, 16),
-        content: '0x' + Math.random().toString(16).substr(2, 16),
-        floral: '0x' + Math.random().toString(16).substr(2, 16)
-      });
-      setUploadStatus('Hashes generated successfully!');
-    }, 2000);
+    setUploadStatus('Generating content hash...');
+    const contentHash = await generateContentHash(selectedFile);
+    
+    setUploadStatus('Generating floral hash...');
+    const floralHash = await generateFloralHash(selectedFile);
+    
+    setHashes({
+      legal: legalHash,
+      content: contentHash,
+      floral: floralHash
+    });
+    
+    setUploadStatus('✅ All hashes generated successfully! Ready for blockchain.');
   };
 
   return (
@@ -46,6 +78,11 @@ export default function Home() {
           accept="image/*,video/*"
         />
         <br />
+        {selectedFile && (
+          <p style={{ margin: '10px 0', color: '#666' }}>
+            Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+          </p>
+        )}
         <button 
           onClick={handleUpload}
           disabled={!selectedFile}
@@ -66,8 +103,8 @@ export default function Home() {
       {uploadStatus && (
         <div style={{ 
           padding: '10px', 
-          backgroundColor: '#f0f8ff', 
-          border: '1px solid #0070f3',
+          backgroundColor: uploadStatus.includes('✅') ? '#f0fff0' : '#f0f8ff', 
+          border: uploadStatus.includes('✅') ? '1px solid #00a000' : '1px solid #0070f3',
           borderRadius: '5px',
           margin: '10px 0'
         }}>
@@ -85,12 +122,18 @@ export default function Home() {
             borderRadius: '8px',
             border: '1px solid #ddd'
           }}>
-            <p><strong>Legal Hash (SHA-256):</strong> {hashes.legal}</p>
-            <p><strong>Content Hash (Perceptual):</strong> {hashes.content}</p>
-            <p><strong>Floral Hash (Visual):</strong> {hashes.floral}</p>
+            <p><strong>Legal Hash (SHA-256):</strong> 
+              <br /><code style={{ fontSize: '12px', wordBreak: 'break-all' }}>{hashes.legal}</code>
+            </p>
+            <p><strong>Content Hash (Perceptual):</strong> 
+              <br /><code style={{ fontSize: '12px', wordBreak: 'break-all' }}>{hashes.content}</code>
+            </p>
+            <p><strong>Floral Hash (Visual):</strong> 
+              <br /><code style={{ fontSize: '12px', wordBreak: 'break-all' }}>{hashes.floral}</code>
+            </p>
           </div>
           <p style={{ fontSize: '14px', color: '#666', marginTop: '10px' }}>
-            Next: We'll store these hashes on the blockchain
+            Next: We'll store these hashes in Supabase and on the blockchain
           </p>
         </div>
       )}
