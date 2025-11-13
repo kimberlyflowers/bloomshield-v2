@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useSDK } from "@thirdweb-dev/react";
 
 // 🚨 SECURITY NOTE: Using service_role key to bypass RLS for prototyping
 // TODO: Replace with proper RLS policies before production
@@ -48,9 +47,9 @@ const generateFloralHash = async (file: File): Promise<string> => {
   return '0xFLORAL' + baseHash.slice(0, 8);
 };
 
-// Simulated blockchain function
+// Simulated blockchain function (no ThirdWeb dependencies)
 const storeOnBlockchain = async (legalHash: string, contentHash: string, floralHash: string) => {
-  // Simulate blockchain transaction - replace with real ThirdWeb calls later
+  // Simulate blockchain transaction - will replace with real calls later
   return new Promise<string>((resolve) => {
     setTimeout(() => {
       const simulatedTx = `0x${Math.random().toString(16).substr(2, 64)}`;
@@ -65,8 +64,6 @@ export default function Home() {
   const [hashes, setHashes] = useState<{legal: string, content: string, floral: string} | null>(null);
   const [supabaseRecord, setSupabaseRecord] = useState<any>(null);
   const [blockchainTx, setBlockchainTx] = useState<string | null>(null);
-  
-  const sdk = useSDK();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
