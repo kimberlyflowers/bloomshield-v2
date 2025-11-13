@@ -1,11 +1,8 @@
-'use client';
-
-import { ThirdwebProvider } from "@thirdweb-dev/react";
-import { Polygon } from "@thirdweb-dev/chains";
+import './globals.css';
 
 export const metadata = {
   title: 'BloomShield',
-  description: 'Digital Content Protection Platform',
+  description: 'Digital Content Protection Platform with Blockchain Timestamping',
 };
 
 export default function RootLayout({
@@ -15,14 +12,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
-        <ThirdwebProvider
-          activeChain={Polygon}
-          clientId="c31c83cc19b0b7b3124743f28b2d3b26" // We'll get this next
-        >
-          {children}
-        </ThirdwebProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
