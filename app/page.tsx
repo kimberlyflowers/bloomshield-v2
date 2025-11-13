@@ -2,6 +2,11 @@
 
 import { useState } from 'react';
 
+// 🚨 SECURITY NOTE: Using service_role key to bypass RLS for prototyping
+// TODO: Replace with proper RLS policies before production
+// Current setup allows full database access - not secure for user data
+// RLS Policies needed: Authenticated users only for INSERT/UPDATE/DELETE
+
 // Supabase client
 const getSupabaseClient = () => {
   if (typeof window === 'undefined') return null;
