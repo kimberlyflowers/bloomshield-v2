@@ -1,14 +1,12 @@
-export default function Home() {
-  // ADD THESE TEST LINES:
-  console.log('🔍 TEST: Page component is rendering!');
-  console.log('🔍 TEST: React is working!');
-  // END TEST LINES
-
-  // ... rest of your existing code continues belowuse client';
+'use client';
 
 import { useState, useRef } from 'react';
 
 export default function Home() {
+  // TEST LOGS - INSIDE COMPONENT
+  console.log('🔍 TEST: Page component is rendering!');
+  console.log('🔍 TEST: React is working!');
+
   // Supabase client - MOVED INSIDE COMPONENT
   const getSupabaseClient = () => {
     if (typeof window === 'undefined') return null;
