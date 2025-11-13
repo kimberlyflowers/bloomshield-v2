@@ -48,22 +48,34 @@ const generateFloralHash = async (file: File): Promise<string> => {
   return '0xFLORAL' + baseHash.slice(0, 8);
 };
 
-// Real blockchain function
-const storeOnBlockchain = async (legalHash: string, contentHash: string, floralHash: string, sdk: any) => {
-  if (!sdk) {
-    throw new Error('ThirdWeb SDK not initialized');
-  }
-
+// Server-side blockchain function (NO CSP ISSUES!)
+const storeOnBlockchain = async (legalHash: string, contentHash: string, floralHash: string, fileName: string, fileSize: number, fileType: string) => {
   try {
-    // Create a signature-based proof on blockchain
-    // This creates a permanent timestamped record
-    const message = `BloomShield Protection: ${legalHash}`;
-    const signature = await sdk.wallet.sign(message);
+    const response = await fetch('/api/blockchain/timestamp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        legalHash,
+        contentHash,
+        floralHash,
+        fileName,
+        fileSize,
+        mimeType: fileType
+      })
+    });
     
-    return signature;
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to create blockchain timestamp');
+    }
+    
+    return data.blockchain.transactionHash;
   } catch (error) {
-    console.error('Blockchain error:', error);
-    // Fallback to simulated transaction if blockchain fails
+    console.error('Blockchain API error:', error);
+    // Fallback to simulated transaction
     return `0xSIM${Math.random().toString(16).substr(2, 60)}`;
   }
 };
@@ -108,9 +120,16 @@ export default function Home() {
       setUploadStatus('Generating floral hash...');
       const floralHash = await generateFloralHash(selectedFile);
 
-      // Step 2: Store on Blockchain (REAL ThirdWeb call)
+      // Step 2: Store on Blockchain (SERVER-SIDE - NO CSP!)
       setUploadStatus('Creating blockchain timestamp on Polygon...');
-      const blockchainTransaction = await storeOnBlockchain(legalHash, contentHash, floralHash, sdk);
+      const blockchainTransaction = await storeOnBlockchain(
+        legalHash, 
+        contentHash, 
+        floralHash, 
+        selectedFile.name, 
+        selectedFile.size, 
+        selectedFile.type
+      );
       setBlockchainTx(blockchainTransaction);
 
       // Step 3: Upload file to Supabase Storage
@@ -231,7 +250,7 @@ export default function Home() {
                 <br /><code style={{ fontSize: '12px', wordBreak: 'break-all' }}>{blockchainTx}</code>
                 {blockchainTx.startsWith('0xSIM') && (
                   <span style={{ color: '#ffa500', fontSize: '12px', display: 'block' }}>
-                    (Simulated - Connect wallet for real blockchain)
+                    (Simulated - Will be real blockchain when contract is deployed)
                   </span>
                 )}
               </p>
