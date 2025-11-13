@@ -1,4 +1,10 @@
-'use client';
+export default function Home() {
+  // ADD THESE TEST LINES:
+  console.log('🔍 TEST: Page component is rendering!');
+  console.log('🔍 TEST: React is working!');
+  // END TEST LINES
+
+  // ... rest of your existing code continues belowuse client';
 
 import { useState, useRef } from 'react';
 
