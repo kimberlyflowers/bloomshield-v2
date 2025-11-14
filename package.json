@@ -14,7 +14,8 @@
     "next": "14.0.0",
     "@supabase/supabase-js": "^2.38.0",
     "crypto-js": "^4.1.1",
-    "@thirdweb-dev/sdk": "^5.12.6"
+    "@thirdweb-dev/sdk": "latest",
+    "ethers": "^5.7.2"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
