@@ -1,18 +1,21 @@
-import './globals.css';
+import type { Metadata } from 'next'
+import './globals.css'
 
-export const metadata = {
-  title: 'BloomShield',
-  description: 'Digital Content Protection Platform with Blockchain Timestamping',
-};
+export const metadata: Metadata = {
+  title: 'BloomShield - File Protection',
+  description: 'Protect your creative work with blockchain timestamping',
+}
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+      </body>
     </html>
-  );
+  )
 }
