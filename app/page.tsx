@@ -12,7 +12,7 @@ export default function Home() {
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <h1 className="text-3xl font-bold text-center mb-4">
-            🌼 BloomShield - Component Test
+            🌼 BloomShield - Component Test VERSION 2
           </h1>
           
           <div className="text-center space-y-4">
@@ -31,6 +31,9 @@ export default function Home() {
             <div className="mt-4 p-4 bg-green-50 rounded-lg">
               <p className="text-sm text-green-700">
                 ✅ If you can see this and the button works, React is rendering!
+              </p>
+              <p className="text-sm text-green-700 mt-2">
+                🔍 Check browser console for logs
               </p>
             </div>
           </div>
