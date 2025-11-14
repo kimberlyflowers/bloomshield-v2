@@ -3,11 +3,16 @@
 import { useState, useRef } from 'react';
 
 export default function Home() {
-  // TEST LOGS - INSIDE COMPONENT
-  console.log('🔍 TEST: Page component is rendering!');
-  console.log('🔍 TEST: React is working!');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string>('');
+  const [legalHash, setLegalHash] = useState<string>('');
+  const [contentHash, setContentHash] = useState<string>('');
+  const [floralHash, setFloralHash] = useState<string>('');
+  const [blockchainTx, setBlockchainTx] = useState<string>('');
+  const [recordId, setRecordId] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Supabase client - MOVED INSIDE COMPONENT
+  // Supabase client
   const getSupabaseClient = () => {
     if (typeof window === 'undefined') return null;
     
@@ -28,30 +33,25 @@ export default function Home() {
     }
   };
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadStatus, setUploadStatus] = useState<string>('');
-  const [legalHash, setLegalHash] = useState<string>('');
-  const [contentHash, setContentHash] = useState<string>('');
-  const [floralHash, setFloralHash] = useState<string>('');
-  const [blockchainTx, setBlockchainTx] = useState<string>('');
-  const [recordId, setRecordId] = useState<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
+  // Generate all 3 hashes
   const generateHashes = async (file: File) => {
     try {
       const arrayBuffer = await file.arrayBuffer();
+      
+      // Legal Hash (SHA-256)
       const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const legal = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
+      // Content Hash (Perceptual)
       const uint8Array = new Uint8Array(arrayBuffer);
       let simpleSum = 0;
       for (let i = 0; i < Math.min(uint8Array.length, 1000); i++) {
         simpleSum += uint8Array[i];
       }
-      // Use a smaller number to avoid BigInt issues
       const content = '0x' + (simpleSum % 10000000000000000).toString(16).padStart(16, '0');
 
+      // Floral Hash (Visual)
       const floral = '0xFLORAL' + legal.substring(0, 10);
 
       return { legal, content, floral };
@@ -77,15 +77,12 @@ export default function Home() {
       setContentHash(hashes.content);
       setFloralHash(hashes.floral);
 
-      // Step 2: TEST BLOCKCHAIN API DIRECTLY
+      // Step 2: Blockchain Timestamp
       setUploadStatus('⛓️ Creating blockchain timestamp...');
-      console.log('🔗 DEBUG: Starting blockchain API test...');
-      
       let blockchainTransactionHash = '';
       let blockchainTimestamp = '';
       
       try {
-        console.log('🔗 DEBUG: Making fetch request to /api/blockchain/timestamp');
         const response = await fetch('/api/blockchain/timestamp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -99,20 +96,17 @@ export default function Home() {
           }),
         });
 
-        console.log('📡 DEBUG: Response status:', response.status);
         const result = await response.json();
-        console.log('📦 DEBUG: Full API response:', result);
 
         if (response.ok && result.success) {
           blockchainTransactionHash = result.blockchain.transactionHash;
           blockchainTimestamp = new Date(result.blockchain.timestamp).toISOString();
           setBlockchainTx(blockchainTransactionHash);
-          console.log('✅ DEBUG: Blockchain timestamp created!');
         } else {
           throw new Error(result.error || 'Blockchain API failed');
         }
       } catch (blockchainError) {
-        console.error('❌ DEBUG: Blockchain call failed:', blockchainError);
+        console.error('Blockchain call failed:', blockchainError);
         // Fallback to simulated transaction
         blockchainTransactionHash = `0xSIM${Math.random().toString(16).substr(2, 60)}`;
         blockchainTimestamp = new Date().toISOString();
@@ -121,19 +115,13 @@ export default function Home() {
 
       // Step 3: Upload to Supabase Storage
       setUploadStatus('Uploading to secure storage...');
-      // Use hash + timestamp to avoid collisions
       const fileName = `${hashes.legal.slice(0, 16)}_${Date.now()}_${selectedFile.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('protected-files')
         .upload(fileName, selectedFile);
 
-      if (uploadError) {
-        if (uploadError.message.includes('already exists')) {
-          // File already exists, that's okay - continue with existing file
-          console.log('⚠️ DEBUG: File already exists in storage, continuing...');
-        } else {
-          throw uploadError;
-        }
+      if (uploadError && !uploadError.message.includes('already exists')) {
+        throw uploadError;
       }
 
       // Step 4: Save to Database
@@ -180,17 +168,17 @@ export default function Home() {
           <p className="text-center text-gray-600 mb-8">Upload your file to generate protection hashes</p>
 
           <div className="space-y-6">
+            {/* File Upload Area */}
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 transition-colors">
               <input
                 type="file"
                 ref={fileInputRef}
                 onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                 className="hidden"
-                key={selectedFile?.name} // Reset input when new file selected
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="text-purple-600 hover:text-purple-700 font-medium"
+                className="bg-gradient-to-r from-pink-500 to-purple-500 text-white font-semibold py-3 px-6 rounded-lg hover:from-pink-600 hover:to-purple-600 transition-all"
               >
                 📎 Choose File
               </button>
@@ -201,6 +189,7 @@ export default function Home() {
               )}
             </div>
 
+            {/* Upload Button */}
             <button
               onClick={handleUpload}
               disabled={!selectedFile}
@@ -209,6 +198,7 @@ export default function Home() {
               Generate Protection Hashes
             </button>
 
+            {/* Upload Status */}
             {uploadStatus && (
               <div className={`p-4 rounded-lg ${
                 uploadStatus.includes('Error') ? 'bg-red-50 text-red-700' : 
@@ -219,6 +209,7 @@ export default function Home() {
               </div>
             )}
 
+            {/* Triple Hash Display */}
             {legalHash && (
               <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-6">
                 <h2 className="text-xl font-bold text-green-800 mb-4">✅ Your File is Protected!</h2>
@@ -231,12 +222,12 @@ export default function Home() {
                   
                   <div>
                     <span className="font-semibold text-gray-700">Content Hash (Perceptual):</span>
-                    <p className="font-mono bg-white p-2 rounded mt-1">{contentHash}</p>
+                    <p className="font-mono bg-white p-2 rounded mt-1 break-all">{contentHash}</p>
                   </div>
                   
                   <div>
                     <span className="font-semibold text-gray-700">Floral Hash (Visual):</span>
-                    <p className="font-mono bg-white p-2 rounded mt-1">{floralHash}</p>
+                    <p className="font-mono bg-white p-2 rounded mt-1 break-all">{floralHash}</p>
                   </div>
 
                   {blockchainTx && (
