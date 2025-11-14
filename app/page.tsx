@@ -12,7 +12,7 @@ export default function Home() {
   const [recordId, setRecordId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Supabase client
+  // Supabase client - FIXED: No require() in client component
   const getSupabaseClient = () => {
     if (typeof window === 'undefined') return null;
     
@@ -25,8 +25,12 @@ export default function Home() {
     }
     
     try {
-      const { createClient } = require('@supabase/supabase-js');
-      return createClient(supabaseUrl, supabaseKey);
+      // Dynamically import Supabase to avoid SSR issues
+      if (typeof window !== 'undefined') {
+        const { createClient } = require('@supabase/supabase-js');
+        return createClient(supabaseUrl, supabaseKey);
+      }
+      return null;
     } catch (error) {
       console.error('Failed to create Supabase client:', error);
       return null;
@@ -159,17 +163,17 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 p-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 p-4 flex items-center justify-center">
+      <div className="w-full max-w-2xl">
+        <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
           <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
             🌼 BloomShield Prototype
           </h1>
           <p className="text-center text-gray-600 mb-8">Upload your file to generate protection hashes</p>
 
           <div className="space-y-6">
-            {/* File Upload Area */}
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 transition-colors">
+            {/* Single File Upload Area */}
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-purple-400 transition-colors">
               <input
                 type="file"
                 ref={fileInputRef}
@@ -189,7 +193,7 @@ export default function Home() {
               )}
             </div>
 
-            {/* Upload Button */}
+            {/* Single Upload Button */}
             <button
               onClick={handleUpload}
               disabled={!selectedFile}
@@ -217,21 +221,21 @@ export default function Home() {
                 <div className="space-y-4 text-sm">
                   <div>
                     <span className="font-semibold text-gray-700">Legal Hash (SHA-256):</span>
-                    <div className="font-mono bg-white p-3 rounded mt-1 text-xs overflow-x-auto whitespace-nowrap border break-all">
+                    <div className="font-mono bg-white p-3 rounded mt-1 text-xs overflow-x-auto whitespace-nowrap border">
                       {legalHash}
                     </div>
                   </div>
                   
                   <div>
                     <span className="font-semibold text-gray-700">Content Hash (Perceptual):</span>
-                    <div className="font-mono bg-white p-3 rounded mt-1 text-xs overflow-x-auto whitespace-nowrap border break-all">
+                    <div className="font-mono bg-white p-3 rounded mt-1 text-xs overflow-x-auto whitespace-nowrap border">
                       {contentHash}
                     </div>
                   </div>
                   
                   <div>
                     <span className="font-semibold text-gray-700">Floral Hash (Visual):</span>
-                    <div className="font-mono bg-white p-3 rounded mt-1 text-xs overflow-x-auto whitespace-nowrap border break-all">
+                    <div className="font-mono bg-white p-3 rounded mt-1 text-xs overflow-x-auto whitespace-nowrap border">
                       {floralHash}
                     </div>
                   </div>
@@ -241,7 +245,7 @@ export default function Home() {
                       <span className="font-semibold text-gray-700">
                         {blockchainTx.startsWith('0xSIM') ? '⚠️ Simulated Blockchain TX:' : '⛓️ Blockchain TX:'}
                       </span>
-                      <div className="font-mono bg-white p-3 rounded mt-1 text-xs overflow-x-auto whitespace-nowrap border break-all">
+                      <div className="font-mono bg-white p-3 rounded mt-1 text-xs overflow-x-auto whitespace-nowrap border">
                         {blockchainTx}
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
