@@ -9,12 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "14.0.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
+    "next": "14.0.0",
     "@supabase/supabase-js": "^2.38.0",
     "crypto-js": "^4.1.1",
-    "@thirdweb-dev/sdk": "^5.9.2"
+    "@thirdweb-dev/sdk": "^5.8.7"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
