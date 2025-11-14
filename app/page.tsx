@@ -160,7 +160,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 p-8">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
             🌼 BloomShield Prototype
@@ -214,20 +214,26 @@ export default function Home() {
               <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-6">
                 <h2 className="text-xl font-bold text-green-800 mb-4">✅ Your File is Protected!</h2>
                 
-                <div className="space-y-3 text-sm">
+                <div className="space-y-4 text-sm">
                   <div>
                     <span className="font-semibold text-gray-700">Legal Hash (SHA-256):</span>
-                    <p className="font-mono bg-white p-2 rounded mt-1 break-all">{legalHash}</p>
+                    <div className="font-mono bg-white p-3 rounded mt-1 text-xs overflow-x-auto whitespace-nowrap border break-all">
+                      {legalHash}
+                    </div>
                   </div>
                   
                   <div>
                     <span className="font-semibold text-gray-700">Content Hash (Perceptual):</span>
-                    <p className="font-mono bg-white p-2 rounded mt-1 break-all">{contentHash}</p>
+                    <div className="font-mono bg-white p-3 rounded mt-1 text-xs overflow-x-auto whitespace-nowrap border break-all">
+                      {contentHash}
+                    </div>
                   </div>
                   
                   <div>
                     <span className="font-semibold text-gray-700">Floral Hash (Visual):</span>
-                    <p className="font-mono bg-white p-2 rounded mt-1 break-all">{floralHash}</p>
+                    <div className="font-mono bg-white p-3 rounded mt-1 text-xs overflow-x-auto whitespace-nowrap border break-all">
+                      {floralHash}
+                    </div>
                   </div>
 
                   {blockchainTx && (
@@ -235,7 +241,12 @@ export default function Home() {
                       <span className="font-semibold text-gray-700">
                         {blockchainTx.startsWith('0xSIM') ? '⚠️ Simulated Blockchain TX:' : '⛓️ Blockchain TX:'}
                       </span>
-                      <p className="font-mono bg-white p-2 rounded mt-1 break-all">{blockchainTx}</p>
+                      <div className="font-mono bg-white p-3 rounded mt-1 text-xs overflow-x-auto whitespace-nowrap border break-all">
+                        {blockchainTx}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Transaction ID: {blockchainTx.length} characters
+                      </p>
                     </div>
                   )}
 
