@@ -267,8 +267,8 @@ export default function Home() {
   // Handle actual login after method selection
   const handleLoginComplete = (method: 'google' | 'email' | 'facebook') => {
     setIsLoggedIn(true);
-    setIsSidebarActive(true);
-    setCurrentPage('dashboard');
+    // Don't auto-navigate - stay on current page
+    // Don't auto-open sidebar - let user open it via hamburger menu
 
     const methodNames = {
       google: 'Google',
@@ -276,7 +276,7 @@ export default function Home() {
       facebook: 'Facebook'
     };
 
-    showToastMessage(`🔐 Logged in with ${methodNames[method]}! Welcome to your Dashboard`, 'success');
+    showToastMessage(`🔐 Logged in with ${methodNames[method]}! Welcome to BloomShield`, 'success');
   };
 
   // Handle navigation
