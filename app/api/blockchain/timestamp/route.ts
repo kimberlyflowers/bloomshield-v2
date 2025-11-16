@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { ThirdwebSDK } from '@thirdweb-dev/sdk';
 
 /**
  * POST /api/blockchain/timestamp
- * Server-side blockchain timestamping (NO CSP ISSUES!)
+ * Server-side blockchain timestamping with ThirdWeb
  */
 export async function POST(request: Request) {
   try {
@@ -10,25 +11,39 @@ export async function POST(request: Request) {
 
     console.log('🔗 Creating blockchain timestamp for:', legalHash);
 
-    // For now, simulate blockchain transaction
-    // This will be replaced with real ThirdWeb calls once we confirm the flow works
-    const simulatedTx = `0x${Math.random().toString(16).substr(2, 64)}`;
-    const timestamp = Date.now();
+    // Initialize ThirdWeb SDK
+    const sdk = ThirdwebSDK.fromPrivateKey(
+      process.env.THIRDWEB_PRIVATE_KEY || '',
+      'polygon',
+      {
+        clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID,
+        secretKey: process.env.THIRDWEB_SECRET_KEY,
+      }
+    );
 
-    // Simulate blockchain processing time
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Get the contract
+    const contractAddress = process.env.THIRDWEB_CONTRACT_ADDRESS || '';
+    const contract = await sdk.getContract(contractAddress);
 
-    console.log('✅ Blockchain timestamp created:', simulatedTx);
+    // Create blockchain timestamp transaction
+    const tx = await contract.call('createTimestamp', [
+      legalHash,
+      contentHash,
+      floralHash,
+      fileName,
+    ]);
+
+    console.log('✅ Blockchain timestamp created:', tx.receipt.transactionHash);
 
     return NextResponse.json({
       success: true,
       blockchain: {
         chain: 'polygon',
-        contractAddress: '0xSIMULATED',
-        transactionHash: simulatedTx,
-        blockNumber: Math.floor(Math.random() * 1000000),
-        timestamp,
-        explorer: `https://mumbai.polygonscan.com/tx/${simulatedTx}`,
+        contractAddress: contractAddress,
+        transactionHash: tx.receipt.transactionHash,
+        blockNumber: tx.receipt.blockNumber,
+        timestamp: Date.now(),
+        explorer: `https://polygonscan.com/tx/${tx.receipt.transactionHash}`,
       },
       hashes: {
         legalHash,
@@ -39,9 +54,9 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('❌ Blockchain timestamp error:', error);
-    
+
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to create blockchain timestamp',
         details: error.message
       },
@@ -56,13 +71,37 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const txHash = searchParams.get('txHash');
-  
-  return NextResponse.json({
-    success: true,
-    verification: {
-      transactionHash: txHash,
-      confirmed: true,
-      timestamp: Date.now(),
-    }
-  });
+
+  try {
+    const sdk = ThirdwebSDK.fromPrivateKey(
+      process.env.THIRDWEB_PRIVATE_KEY || '',
+      'polygon',
+      {
+        clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID,
+        secretKey: process.env.THIRDWEB_SECRET_KEY,
+      }
+    );
+
+    // Get transaction receipt to verify
+    const provider = sdk.getProvider();
+    const receipt = await provider.getTransactionReceipt(txHash || '');
+
+    return NextResponse.json({
+      success: true,
+      verification: {
+        transactionHash: txHash,
+        confirmed: receipt?.confirmations > 0,
+        blockNumber: receipt?.blockNumber,
+        timestamp: Date.now(),
+      }
+    });
+  } catch (error: any) {
+    return NextResponse.json(
+      {
+        error: 'Failed to verify timestamp',
+        details: error.message
+      },
+      { status: 500 }
+    );
+  }
 }
