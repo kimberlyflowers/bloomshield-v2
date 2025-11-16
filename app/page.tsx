@@ -269,6 +269,11 @@ export default function Home() {
     showToastMessage(`📄 Navigated to ${page.charAt(0).toUpperCase() + page.slice(1)}`, 'success');
   };
 
+  // Handle sidebar toggle
+  const handleToggleSidebar = () => {
+    setIsSidebarActive(!isSidebarActive);
+  };
+
   // Handle processing complete
   const handleProcessingComplete = () => {
     setShowProcessing(false);
@@ -287,6 +292,14 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Backdrop Overlay for mobile sidebar */}
+      {isSidebarActive && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-[998] md:hidden"
+          onClick={() => setIsSidebarActive(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <Sidebar
         isActive={isSidebarActive}
@@ -295,9 +308,13 @@ export default function Home() {
       />
 
       {/* Main Content */}
-      <div className={`transition-all duration-500 ease-in-out ${isSidebarActive ? 'ml-[280px]' : 'ml-0'}`}>
+      <div className={`transition-all duration-500 ease-in-out ${isSidebarActive ? 'ml-0 md:ml-[280px]' : 'ml-0'}`}>
         {/* Top Bar */}
-        <TopBar onLogin={handleLogin} isLoggedIn={isLoggedIn} />
+        <TopBar
+          onLogin={handleLogin}
+          isLoggedIn={isLoggedIn}
+          onToggleSidebar={handleToggleSidebar}
+        />
 
         {/* Toast Notification */}
         <Toast
@@ -309,24 +326,24 @@ export default function Home() {
 
         {/* HOME PAGE */}
         {currentPage === 'home' && (
-          <div className="flex items-center justify-center min-h-[calc(100vh-70px)] p-8">
-            <div className="w-full max-w-6xl">
+          <div className="flex items-center justify-center min-h-[calc(100vh-80px)] p-4 md:p-8">
+            <div className="w-full max-w-6xl mx-auto">
               {/* Title */}
-              <div className="text-center mb-12">
-                <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-pink-500 via-[#FF8C42] to-yellow-400 bg-clip-text text-transparent">
+              <div className="text-center mb-8 md:mb-12">
+                <h1 className="text-4xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-pink-500 via-[#FF8C42] to-yellow-400 bg-clip-text text-transparent">
                   BloomShield
                 </h1>
-                <p className="text-xl text-gray-600">
+                <p className="text-lg md:text-xl text-gray-600 px-4">
                   Protect and verify creative ownership on the blockchain
                 </p>
               </div>
 
               {/* Two Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
                 {/* Verify Card */}
-                <div className="bg-white p-10 rounded-2xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1">
-                  <h3 className="text-2xl font-bold text-gray-800 mb-4">🔍 Verify Content</h3>
-                  <p className="text-gray-600 mb-6 leading-relaxed">
+                <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1">
+                  <h3 className="text-xl font-bold text-gray-800 mb-3">🔍 Verify Content</h3>
+                  <p className="text-gray-600 mb-4 text-sm leading-relaxed">
                     Search by Shield ID or creator name to verify authentic ownership
                   </p>
                   <input
@@ -335,20 +352,20 @@ export default function Home() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                     placeholder="🌸 BS-a7f5-b3k9-c8m2"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none transition-colors mb-6"
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none transition-colors mb-4"
                   />
                   <button
                     onClick={handleSearch}
-                    className="w-full bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-bold py-3 px-8 rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                    className="w-full bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-bold py-2.5 px-6 rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-lg"
                   >
                     SEARCH
                   </button>
                 </div>
 
                 {/* Upload Card */}
-                <div className="bg-white p-10 rounded-2xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1">
-                  <h3 className="text-2xl font-bold text-gray-800 mb-4">🛡️ Protect Your Work</h3>
-                  <p className="text-gray-600 mb-6 leading-relaxed">
+                <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1">
+                  <h3 className="text-xl font-bold text-gray-800 mb-3">🛡️ Protect Your Work</h3>
+                  <p className="text-gray-600 mb-4 text-sm leading-relaxed">
                     Upload files to generate blockchain certificates and secure your creative work
                   </p>
                   <input
@@ -359,7 +376,7 @@ export default function Home() {
                   />
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="upload-zone mb-6"
+                    className="upload-zone mb-4 cursor-pointer"
                   >
                     <div className="upload-icon">📁</div>
                     <div className="upload-text">
@@ -372,7 +389,7 @@ export default function Home() {
                   <button
                     onClick={handleUpload}
                     disabled={!selectedFile}
-                    className="w-full bg-[#FF8C42] hover:bg-[#ff7a2e] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3 px-8 rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                    className="w-full bg-[#FF8C42] hover:bg-[#ff7a2e] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-2.5 px-6 rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-lg"
                   >
                     PROTECT FILE
                   </button>
