@@ -428,257 +428,404 @@ export default function Home() {
 
         {/* DASHBOARD PAGE */}
         {currentPage === 'dashboard' && (
-          <div className="p-4 md:p-8 max-w-7xl mx-auto">
-            <div className="mb-8">
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Dashboard</h1>
-              <p className="text-gray-600">Protection overview and theft monitoring</p>
-            </div>
-
-            {/* Main Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
-              <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-l-4 border-[#FF8C42]">
-                <div className="text-gray-500 text-sm font-medium mb-2">Total Protected</div>
-                <div className="text-3xl font-bold text-gray-800">{recordId || 0}</div>
-                <div className="text-xs text-gray-400 mt-1">Files secured</div>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-l-4 border-blue-500">
-                <div className="text-gray-500 text-sm font-medium mb-2">Active Monitoring</div>
-                <div className="text-3xl font-bold text-gray-800">0</div>
-                <div className="text-xs text-gray-400 mt-1">Platform scans</div>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-l-4 border-red-500">
-                <div className="text-gray-500 text-sm font-medium mb-2">Theft Detected</div>
-                <div className="text-3xl font-bold text-gray-800">0</div>
-                <div className="text-xs text-gray-400 mt-1">Matches found</div>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-l-4 border-green-500">
-                <div className="text-gray-500 text-sm font-medium mb-2">Open Cases</div>
-                <div className="text-3xl font-bold text-gray-800">0</div>
-                <div className="text-xs text-gray-400 mt-1">Active disputes</div>
-              </div>
-            </div>
-
-            {/* Platform Breakdown */}
-            <div className="bg-white rounded-xl shadow-md p-6 mb-8">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Platform Monitoring</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  { name: 'YouTube', count: 0 },
-                  { name: 'Instagram', count: 0 },
-                  { name: 'SoundCloud', count: 0 },
-                  { name: 'TikTok', count: 0 },
-                  { name: 'Spotify', count: 0 },
-                  { name: 'Facebook', count: 0 },
-                  { name: 'Twitter', count: 0 },
-                  { name: 'Pinterest', count: 0 }
-                ].map((platform) => (
-                  <div key={platform.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                      <span className="text-sm font-medium text-gray-700">{platform.name}</span>
-                    </div>
-                    <span className="text-xs text-gray-500">{platform.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* One-Click Actions */}
-            <div className="bg-white rounded-xl shadow-md p-6 mb-8">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Quick Actions</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex h-[calc(100vh-70px)] bg-gray-50">
+            {/* Dashboard Submenu */}
+            <div className="w-60 bg-white border-r border-gray-200 p-8 overflow-y-auto">
+              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Dashboard</h2>
+              <nav className="space-y-1">
                 <button
-                  onClick={() => setCurrentPage('home')}
-                  className="flex items-center justify-between p-4 bg-gradient-to-r from-[#FF8C42] to-[#ff7a2e] text-white rounded-lg hover:shadow-lg transition-all"
+                  onClick={() => setDashboardSection('overview')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all border-l-3 ${
+                    dashboardSection === 'overview'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
                 >
-                  <div className="text-left">
-                    <div className="font-semibold">Protect New File</div>
-                    <div className="text-sm text-white/80">Upload and secure content</div>
-                  </div>
-                  <div className="text-2xl">🛡️</div>
+                  Overview
                 </button>
                 <button
-                  onClick={() => setCurrentPage('cases')}
-                  className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all"
+                  onClick={() => setDashboardSection('files')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    dashboardSection === 'files'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
                 >
-                  <div className="text-left">
-                    <div className="font-semibold">View Cases</div>
-                    <div className="text-sm text-white/80">Manage disputes</div>
-                  </div>
-                  <div className="text-2xl">⚖️</div>
+                  My Files
                 </button>
-              </div>
+                <button
+                  onClick={() => setDashboardSection('monitoring')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center justify-between ${
+                    dashboardSection === 'monitoring'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  Monitoring
+                  <span className="text-xs bg-orange-100 text-[#FF8C42] px-2 py-0.5 rounded-full font-bold">PRO</span>
+                </button>
+                <button
+                  onClick={() => setDashboardSection('cases')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center justify-between ${
+                    dashboardSection === 'cases'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  Cases
+                  <span className="text-xs bg-orange-100 text-[#FF8C42] px-2 py-0.5 rounded-full font-bold">PRO</span>
+                </button>
+                <button
+                  onClick={() => setDashboardSection('licenses')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    dashboardSection === 'licenses'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  License Requests
+                </button>
+              </nav>
             </div>
 
-            {/* Recent Protection */}
-            {recordId && certificateData && (
-              <div className="mb-8">
-                <h2 className="text-2xl font-bold text-gray-800 mb-4">Recently Protected</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                  <div
-                    className="file-card cursor-pointer"
-                    onClick={() => setShowCertificate(true)}
-                  >
-                    <div
-                      className="w-full h-48 flex items-center justify-center text-6xl"
-                      style={{
-                        background: 'linear-gradient(135deg, #FFB5B5 0%, #FF9D5C 100%)',
-                      }}
-                    >
-                      🎨
+            {/* Dashboard Main Content */}
+            <div className="flex-1 overflow-y-auto p-8">
+              {/* OVERVIEW SECTION */}
+              {dashboardSection === 'overview' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Overview</h1>
+
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-[#FF8C42]">
+                      <div className="text-gray-500 text-sm mb-2">Total Files Protected</div>
+                      <div className="text-4xl font-bold text-gray-800">{recordId || 24}</div>
                     </div>
-                    <div className="p-5">
-                      <div className="font-semibold text-gray-800 mb-2 truncate">{certificateData.fileName}</div>
-                      <div className="text-gray-500 text-sm mb-3">Protected just now</div>
-                      <div className="font-mono bg-gray-100 p-3 rounded-lg text-xs text-gray-600 break-all">
-                        {certificateData.assetId}
+                    <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-[#FF8C42]">
+                      <div className="text-gray-500 text-sm mb-2">Active Monitoring</div>
+                      <div className="text-4xl font-bold text-gray-800">0</div>
+                    </div>
+                    <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-[#FF8C42]">
+                      <div className="text-gray-500 text-sm mb-2">Open Cases</div>
+                      <div className="text-4xl font-bold text-gray-800">0</div>
+                    </div>
+                    <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-[#FF8C42]">
+                      <div className="text-gray-500 text-sm mb-2">License Requests</div>
+                      <div className="text-4xl font-bold text-gray-800">3</div>
+                    </div>
+                  </div>
+
+                  {/* Recent Files */}
+                  <h2 className="text-2xl font-bold text-gray-800 mb-6">Recent Files</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {certificateData && (
+                      <div className="file-card cursor-pointer" onClick={() => setShowCertificate(true)}>
+                        <div className="w-full h-48 flex items-center justify-center text-6xl bg-gradient-to-br from-pink-200 to-orange-300">
+                          🎨
+                        </div>
+                        <div className="p-5">
+                          <div className="font-semibold text-gray-800 mb-2">{certificateData.fileName}</div>
+                          <div className="text-gray-500 text-sm mb-3">Protected just now</div>
+                          <div className="font-mono bg-gray-100 p-3 rounded-lg text-xs text-gray-600">{certificateData.assetId}</div>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Empty State */}
-            {!recordId && (
-              <div className="bg-white rounded-xl shadow-md p-12 md:p-16 text-center">
-                <div className="text-6xl mb-4">📁</div>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">No Protected Files Yet</h3>
-                <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                  Start protecting your creative work with blockchain-verified certificates and real-time theft monitoring
-                </p>
-                <button
-                  onClick={() => setCurrentPage('home')}
-                  className="bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-bold py-3 px-8 rounded-lg transition-all hover:shadow-lg"
-                >
-                  Protect Your First File
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+              {/* MY FILES SECTION */}
+              {dashboardSection === 'files' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-4">My Files</h1>
+                  <p className="text-gray-600 mb-8">All your protected files in one place</p>
 
-        {/* WALLET PAGE */}
-        {currentPage === 'wallet' && (
-          <div className="p-4 md:p-8 max-w-7xl mx-auto">
-            <div className="mb-8">
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Wallet</h1>
-              <p className="text-gray-600">Manage your blockchain assets and transactions</p>
-            </div>
-
-            {/* Wallet Balance Card */}
-            <div className="bg-gradient-to-r from-pink-500 via-[#FF8C42] to-yellow-400 rounded-2xl p-8 mb-8 text-white shadow-lg">
-              <div className="mb-4">
-                <div className="text-white/80 text-sm mb-1">Total Balance</div>
-                <div className="text-4xl font-bold">$0.00</div>
-              </div>
-              <div className="flex gap-4 mt-6">
-                <button className="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-semibold py-2 px-6 rounded-lg transition-all">
-                  Deposit
-                </button>
-                <button className="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-semibold py-2 px-6 rounded-lg transition-all">
-                  Withdraw
-                </button>
-              </div>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
-              <div className="bg-white p-6 rounded-xl shadow-md">
-                <div className="text-gray-500 text-sm mb-2">Blockchain Transactions</div>
-                <div className="text-2xl font-bold text-gray-800">{recordId || 0}</div>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-md">
-                <div className="text-gray-500 text-sm mb-2">Gas Fees Saved</div>
-                <div className="text-2xl font-bold text-gray-800">$0.00</div>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-md">
-                <div className="text-gray-500 text-sm mb-2">NFT Certificates</div>
-                <div className="text-2xl font-bold text-gray-800">{recordId || 0}</div>
-              </div>
-            </div>
-
-            {/* Transaction History */}
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Transaction History</h2>
-              {blockchainTx ? (
-                <div className="border-b border-gray-200 pb-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <div className="font-semibold text-gray-800">File Protection</div>
-                      <div className="text-sm text-gray-500">Blockchain timestamp created</div>
-                    </div>
-                    <div className="text-green-600 font-semibold">Success</div>
-                  </div>
-                  <div className="font-mono text-xs text-gray-600 bg-gray-50 p-2 rounded break-all">
-                    {blockchainTx}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {certificateData && (
+                      <div className="file-card cursor-pointer" onClick={() => setShowCertificate(true)}>
+                        <div className="w-full h-48 flex items-center justify-center text-6xl bg-gradient-to-br from-pink-200 to-orange-300">
+                          🎨
+                        </div>
+                        <div className="p-5">
+                          <div className="font-semibold text-gray-800 mb-2">{certificateData.fileName}</div>
+                          <div className="text-gray-500 text-sm mb-3">Protected just now</div>
+                          <div className="font-mono bg-gray-100 p-3 rounded-lg text-xs text-gray-600">{certificateData.assetId}</div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="text-5xl mb-3">💳</div>
-                  <p className="text-gray-500">No transactions yet</p>
+              )}
+
+              {/* MONITORING SECTION */}
+              {dashboardSection === 'monitoring' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Monitoring</h1>
+
+                  <div className="bg-gradient-to-r from-pink-500 via-[#FF8C42] to-yellow-400 rounded-2xl p-12 text-center text-white shadow-lg">
+                    <h3 className="text-3xl font-bold mb-4">🔍 Unlock Advanced Monitoring</h3>
+                    <p className="text-xl mb-8 opacity-95">Track your content across the web and get alerts when copies are detected</p>
+                    <button className="bg-white text-[#FF8C42] font-bold py-4 px-10 rounded-lg hover:shadow-xl transition-all text-lg">
+                      Upgrade to Pro
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* CASES SECTION */}
+              {dashboardSection === 'cases' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Cases</h1>
+
+                  <div className="bg-gradient-to-r from-pink-500 via-[#FF8C42] to-yellow-400 rounded-2xl p-12 text-center text-white shadow-lg">
+                    <h3 className="text-3xl font-bold mb-4">⚖️ Unlock Case Management</h3>
+                    <p className="text-xl mb-8 opacity-95">Manage infringement cases and work with legal partners to protect your rights</p>
+                    <button className="bg-white text-[#FF8C42] font-bold py-4 px-10 rounded-lg hover:shadow-xl transition-all text-lg">
+                      Upgrade to Pro
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* LICENSE REQUESTS SECTION */}
+              {dashboardSection === 'licenses' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-4">License Requests</h1>
+                  <p className="text-gray-600 mb-8">Manage incoming licensing requests for your work</p>
+
+                  <div className="bg-white rounded-xl shadow-md p-16 text-center">
+                    <div className="text-6xl mb-4">💼</div>
+                    <p className="text-gray-500 text-lg">No license requests yet</p>
+                    <p className="text-gray-400 text-sm mt-2">When someone requests to license your work, it will appear here</p>
+                  </div>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* CASES PAGE - Disputes & Resolution */}
-        {currentPage === 'cases' && (
-          <div className="p-4 md:p-8 max-w-7xl mx-auto">
-            <div className="mb-8">
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Active Cases</h1>
-              <p className="text-gray-600">Manage theft cases and dispute resolution</p>
-            </div>
-
-            {/* Case Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
-              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-orange-500">
-                <div className="text-gray-500 text-sm mb-2">Open Cases</div>
-                <div className="text-3xl font-bold text-gray-800">0</div>
-                <div className="text-xs text-gray-400 mt-1">Active disputes</div>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
-                <div className="text-gray-500 text-sm mb-2">In Progress</div>
-                <div className="text-3xl font-bold text-gray-800">0</div>
-                <div className="text-xs text-gray-400 mt-1">Under review</div>
-              </div>
-              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
-                <div className="text-gray-500 text-sm mb-2">Resolved</div>
-                <div className="text-3xl font-bold text-gray-800">0</div>
-                <div className="text-xs text-gray-400 mt-1">Successfully closed</div>
-              </div>
-            </div>
-
-            {/* Takedown Actions */}
-            <div className="bg-white rounded-xl shadow-md p-6 mb-8">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Quick Takedown Actions</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button className="flex items-center justify-between p-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg transition-all">
-                  <div className="text-left">
-                    <div className="font-semibold">DMCA Takedown</div>
-                    <div className="text-sm text-white/80">Send legal notice</div>
-                  </div>
-                  <div className="text-2xl">📧</div>
+        {/* WALLET PAGE */}
+        {currentPage === 'wallet' && (
+          <div className="flex h-[calc(100vh-70px)] bg-gray-50">
+            {/* Wallet Submenu */}
+            <div className="w-60 bg-white border-r border-gray-200 p-8 overflow-y-auto">
+              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Wallet</h2>
+              <nav className="space-y-1">
+                <button
+                  onClick={() => setWalletSection('overview')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    walletSection === 'overview'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  Overview
                 </button>
-                <button className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all">
-                  <div className="text-left">
-                    <div className="font-semibold">Report Infringement</div>
-                    <div className="text-sm text-white/80">Platform report</div>
-                  </div>
-                  <div className="text-2xl">🚨</div>
+                <button
+                  onClick={() => setWalletSection('cards')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    walletSection === 'cards'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  Cards
                 </button>
-              </div>
+                <button
+                  onClick={() => setWalletSection('transactions')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    walletSection === 'transactions'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  Transactions
+                </button>
+                <button
+                  onClick={() => setWalletSection('deposit')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    walletSection === 'deposit'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  Direct Deposit
+                </button>
+                <button
+                  onClick={() => setWalletSection('settings')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    walletSection === 'settings'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  Settings
+                </button>
+              </nav>
             </div>
 
-            {/* Empty State */}
-            <div className="bg-white rounded-xl shadow-md p-12 text-center">
-              <div className="text-6xl mb-4">⚖️</div>
-              <h3 className="text-xl font-bold text-gray-800 mb-2">No Active Cases</h3>
-              <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                Your content is protected. We'll alert you if any infringements are detected.
-              </p>
+            {/* Wallet Main Content */}
+            <div className="flex-1 overflow-y-auto p-8">
+              {/* OVERVIEW SECTION */}
+              {walletSection === 'overview' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Overview</h1>
+
+                  {/* Balance Display */}
+                  <div className="bg-white rounded-xl shadow-md p-8 mb-8">
+                    <div className="text-gray-500 text-sm mb-2">Available Balance</div>
+                    <div className="text-5xl font-bold text-gray-800 mb-2">$0.00</div>
+                    <div className="text-gray-600 text-sm">Total earnings: $0.00</div>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="grid grid-cols-2 gap-4 mb-8">
+                    <button className="bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-semibold py-4 px-6 rounded-lg transition-all">
+                      + Add Money
+                    </button>
+                    <button className="bg-white border-2 border-[#FF8C42] text-[#FF8C42] hover:bg-orange-50 font-semibold py-4 px-6 rounded-lg transition-all">
+                      Withdraw
+                    </button>
+                  </div>
+
+                  {/* Recent Transactions */}
+                  <h2 className="text-2xl font-bold text-gray-800 mb-4">Recent Transactions</h2>
+                  <div className="bg-white rounded-xl shadow-md p-16 text-center">
+                    <div className="text-6xl mb-4">📊</div>
+                    <p className="text-gray-500">No transactions yet</p>
+                  </div>
+                </div>
+              )}
+
+              {/* CARDS SECTION */}
+              {walletSection === 'cards' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-8">BloomCard</h1>
+
+                  {/* 3D Credit Card */}
+                  <div
+                    className={`w-full max-w-md h-64 rounded-2xl p-8 shadow-2xl mb-8 cursor-pointer transition-all hover:scale-105 ${
+                      cardColor === 'blush' ? 'bg-gradient-to-br from-pink-300 to-pink-200' :
+                      cardColor === 'black' ? 'bg-gradient-to-br from-gray-800 to-gray-900' :
+                      'bg-gradient-to-br from-orange-400 to-pink-400'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-12">
+                      <div className="w-12 h-10 bg-gradient-to-br from-yellow-300 to-yellow-400 rounded-lg"></div>
+                      <div className="text-white font-bold text-xl opacity-90">🌸 Bloom</div>
+                    </div>
+                    <div className="text-white font-mono text-2xl tracking-wider mb-8">•••• •••• •••• 4242</div>
+                    <div className="flex justify-between text-white">
+                      <div>
+                        <div className="text-xs opacity-75 mb-1">CARD HOLDER</div>
+                        <div className="font-semibold">SARAH JOHNSON</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs opacity-75 mb-1">EXPIRES</div>
+                        <div className="font-mono font-semibold">12/28</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Color Picker */}
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Card Color</h3>
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => setCardColor('blush')}
+                        className={`w-16 h-16 rounded-full bg-gradient-to-br from-pink-300 to-pink-200 ${
+                          cardColor === 'blush' ? 'ring-4 ring-[#FF8C42] ring-offset-2' : ''
+                        }`}
+                      />
+                      <button
+                        onClick={() => setCardColor('black')}
+                        className={`w-16 h-16 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 ${
+                          cardColor === 'black' ? 'ring-4 ring-[#FF8C42] ring-offset-2' : ''
+                        }`}
+                      />
+                      <button
+                        onClick={() => setCardColor('orange')}
+                        className={`w-16 h-16 rounded-full bg-gradient-to-br from-orange-400 to-pink-400 ${
+                          cardColor === 'orange' ? 'ring-4 ring-[#FF8C42] ring-offset-2' : ''
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Card Details */}
+                  <div className="bg-white rounded-xl shadow-md p-8 mt-8">
+                    <h3 className="text-xl font-semibold text-gray-800 mb-6">Card Details</h3>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <div className="text-gray-500 text-sm mb-1">Card Number</div>
+                        <div className="font-semibold">•••• •••• •••• 4242</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 text-sm mb-1">CVV</div>
+                        <div className="font-semibold">•••</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 text-sm mb-1">Status</div>
+                        <div className="text-green-600 font-semibold">● Active</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 text-sm mb-1">Type</div>
+                        <div className="font-semibold">Virtual Card</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TRANSACTIONS SECTION */}
+              {walletSection === 'transactions' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Transactions</h1>
+
+                  <div className="bg-white rounded-xl shadow-md p-16 text-center">
+                    <div className="text-6xl mb-4">📋</div>
+                    <p className="text-gray-500 text-lg">No transactions yet</p>
+                    <p className="text-gray-400 text-sm mt-2">All licensing payments and withdrawals will appear here</p>
+                  </div>
+                </div>
+              )}
+
+              {/* DIRECT DEPOSIT SECTION */}
+              {walletSection === 'deposit' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Direct Deposit</h1>
+
+                  <div className="bg-white rounded-xl shadow-md p-16 text-center">
+                    <div className="text-6xl mb-4">🏦</div>
+                    <p className="text-gray-500 text-lg mb-6">No bank account connected</p>
+                    <button className="bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-bold py-3 px-8 rounded-lg transition-all">
+                      Connect Bank Account
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* SETTINGS SECTION */}
+              {walletSection === 'settings' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Wallet Settings</h1>
+
+                  <div className="bg-white rounded-xl shadow-md divide-y">
+                    <div className="p-6">
+                      <h3 className="font-semibold text-gray-800 mb-2">Payment Notifications</h3>
+                      <p className="text-gray-500 text-sm">Get notified when you receive payments</p>
+                    </div>
+                    <div className="p-6">
+                      <h3 className="font-semibold text-gray-800 mb-2">Auto-Withdraw</h3>
+                      <p className="text-gray-500 text-sm">Automatically transfer earnings to your bank</p>
+                    </div>
+                    <div className="p-6">
+                      <h3 className="font-semibold text-gray-800 mb-2">Spending Limits</h3>
+                      <p className="text-gray-500 text-sm">Set daily or monthly spending limits</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
