@@ -6,6 +6,7 @@ import TopBar from '@/components/TopBar';
 import Toast from '@/components/Toast';
 import CertificateModal from '@/components/CertificateModal';
 import ProcessingOverlay from '@/components/ProcessingOverlay';
+import LoginModal from '@/components/LoginModal';
 
 export default function Home() {
   // Page navigation state
@@ -35,6 +36,9 @@ export default function Home() {
   // Certificate modal state
   const [showCertificate, setShowCertificate] = useState(false);
   const [certificateData, setCertificateData] = useState<any>(null);
+
+  // Login modal state
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -255,12 +259,24 @@ export default function Home() {
     showToastMessage(`🔍 Searching for: ${searchQuery}`, 'success');
   };
 
-  // Handle login
+  // Handle login button click - show modal
   const handleLogin = () => {
+    setShowLoginModal(true);
+  };
+
+  // Handle actual login after method selection
+  const handleLoginComplete = (method: 'google' | 'email' | 'facebook') => {
     setIsLoggedIn(true);
     setIsSidebarActive(true);
     setCurrentPage('dashboard');
-    showToastMessage('🔐 Logged in! Welcome to your Dashboard', 'success');
+
+    const methodNames = {
+      google: 'Google',
+      email: 'Email',
+      facebook: 'Facebook'
+    };
+
+    showToastMessage(`🔐 Logged in with ${methodNames[method]}! Welcome to your Dashboard`, 'success');
   };
 
   // Handle navigation
@@ -292,23 +308,25 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Backdrop Overlay for mobile sidebar */}
-      {isSidebarActive && (
+      {/* Backdrop Overlay for mobile sidebar - only show when logged in */}
+      {isLoggedIn && isSidebarActive && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-[998] md:hidden"
           onClick={() => setIsSidebarActive(false)}
         />
       )}
 
-      {/* Sidebar */}
-      <Sidebar
-        isActive={isSidebarActive}
-        onNavigate={handleNavigate}
-        currentPage={currentPage}
-      />
+      {/* Sidebar - only render when logged in */}
+      {isLoggedIn && (
+        <Sidebar
+          isActive={isSidebarActive}
+          onNavigate={handleNavigate}
+          currentPage={currentPage}
+        />
+      )}
 
       {/* Main Content */}
-      <div className={`transition-all duration-500 ease-in-out ${isSidebarActive ? 'ml-0 md:ml-[280px]' : 'ml-0'}`}>
+      <div className={`transition-all duration-500 ease-in-out ${isLoggedIn && isSidebarActive ? 'ml-0 md:ml-[280px]' : 'ml-0'}`}>
         {/* Top Bar */}
         <TopBar
           onLogin={handleLogin}
@@ -486,6 +504,13 @@ export default function Home() {
         show={showProcessing}
         currentStep={processingStep}
         onComplete={handleProcessingComplete}
+      />
+
+      {/* Login Modal */}
+      <LoginModal
+        show={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLogin={handleLoginComplete}
       />
 
       {/* Certificate Modal */}
