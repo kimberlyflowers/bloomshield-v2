@@ -295,7 +295,7 @@ export default function Home() {
       />
 
       {/* Main Content */}
-      <div className={`transition-margin ${isSidebarActive ? 'ml-[280px]' : 'ml-0'}`}>
+      <div className={`transition-all duration-500 ease-in-out ${isSidebarActive ? 'ml-[280px]' : 'ml-0'}`}>
         {/* Top Bar */}
         <TopBar onLogin={handleLogin} isLoggedIn={isLoggedIn} />
 

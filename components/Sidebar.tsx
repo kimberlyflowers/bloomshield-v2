@@ -23,7 +23,7 @@ export default function Sidebar({ isActive, onNavigate, currentPage }: SidebarPr
 
   return (
     <div
-      className={`fixed left-0 top-0 h-screen transition-all duration-400 ease-in-out z-[999] flex flex-col py-8 shadow-xl ${
+      className={`fixed left-0 top-0 h-screen transition-all duration-500 ease-in-out z-[999] flex flex-col py-8 shadow-xl ${
         isActive ? 'translate-x-0' : '-translate-x-full'
       } ${isCollapsed ? 'w-[70px]' : 'w-[280px]'}`}
       style={{
