@@ -345,7 +345,7 @@ export default function Home() {
         {/* HOME PAGE */}
         {currentPage === 'home' && (
           <div className="flex items-center justify-center min-h-[calc(100vh-80px)] p-4 md:p-8">
-            <div className="w-full max-w-6xl mx-auto">
+            <div className="w-full max-w-6xl">
               {/* Title */}
               <div className="text-center mb-8 md:mb-12">
                 <h1 className="text-4xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-pink-500 via-[#FF8C42] to-yellow-400 bg-clip-text text-transparent">
@@ -357,7 +357,7 @@ export default function Home() {
               </div>
 
               {/* Two Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto px-4">
                 {/* Verify Card */}
                 <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1">
                   <h3 className="text-xl font-bold text-gray-800 mb-3">🔍 Verify Content</h3>
@@ -419,36 +419,43 @@ export default function Home() {
 
         {/* DASHBOARD PAGE */}
         {currentPage === 'dashboard' && (
-          <div className="p-8">
-            <h1 className="text-4xl font-bold text-gray-800 mb-8">Dashboard</h1>
+          <div className="p-4 md:p-8 max-w-7xl mx-auto">
+            <div className="mb-8">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Dashboard</h1>
+              <p className="text-gray-600">Welcome back! Here's your protection overview.</p>
+            </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-[#FF8C42]">
-                <div className="text-gray-500 text-sm mb-2">Total Files Protected</div>
-                <div className="text-4xl font-bold text-gray-800">{recordId || 0}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+              <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-l-4 border-[#FF8C42]">
+                <div className="text-gray-500 text-sm font-medium mb-2">Total Protected</div>
+                <div className="text-3xl font-bold text-gray-800">{recordId || 0}</div>
+                <div className="text-xs text-gray-400 mt-1">Files secured</div>
               </div>
-              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-[#FF8C42]">
-                <div className="text-gray-500 text-sm mb-2">Active Monitoring</div>
-                <div className="text-4xl font-bold text-gray-800">0</div>
+              <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-l-4 border-blue-500">
+                <div className="text-gray-500 text-sm font-medium mb-2">Monitoring</div>
+                <div className="text-3xl font-bold text-gray-800">0</div>
+                <div className="text-xs text-gray-400 mt-1">Active scans</div>
               </div>
-              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-[#FF8C42]">
-                <div className="text-gray-500 text-sm mb-2">Open Cases</div>
-                <div className="text-4xl font-bold text-gray-800">0</div>
+              <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-l-4 border-green-500">
+                <div className="text-gray-500 text-sm font-medium mb-2">Open Cases</div>
+                <div className="text-3xl font-bold text-gray-800">0</div>
+                <div className="text-xs text-gray-400 mt-1">Active disputes</div>
               </div>
-              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-[#FF8C42]">
-                <div className="text-gray-500 text-sm mb-2">License Requests</div>
-                <div className="text-4xl font-bold text-gray-800">0</div>
+              <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-l-4 border-purple-500">
+                <div className="text-gray-500 text-sm font-medium mb-2">Licenses</div>
+                <div className="text-3xl font-bold text-gray-800">0</div>
+                <div className="text-xs text-gray-400 mt-1">Requests pending</div>
               </div>
             </div>
 
             {/* Recent Protection */}
             {recordId && certificateData && (
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-6">Recently Protected</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">Recently Protected</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                   <div
-                    className="file-card"
+                    className="file-card cursor-pointer"
                     onClick={() => setShowCertificate(true)}
                   >
                     <div
@@ -460,9 +467,9 @@ export default function Home() {
                       🎨
                     </div>
                     <div className="p-5">
-                      <div className="font-semibold text-gray-800 mb-2">{certificateData.fileName}</div>
+                      <div className="font-semibold text-gray-800 mb-2 truncate">{certificateData.fileName}</div>
                       <div className="text-gray-500 text-sm mb-3">Protected just now</div>
-                      <div className="font-mono bg-gray-100 p-3 rounded-lg text-xs text-gray-600 overflow-hidden text-ellipsis">
+                      <div className="font-mono bg-gray-100 p-3 rounded-lg text-xs text-gray-600 break-all">
                         {certificateData.assetId}
                       </div>
                     </div>
@@ -473,12 +480,15 @@ export default function Home() {
 
             {/* Empty State */}
             {!recordId && (
-              <div className="bg-white rounded-xl shadow-md p-16 text-center">
+              <div className="bg-white rounded-xl shadow-md p-12 md:p-16 text-center">
                 <div className="text-6xl mb-4">📁</div>
-                <p className="text-gray-500 text-lg mb-6">No files protected yet</p>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">No Protected Files Yet</h3>
+                <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                  Start protecting your creative work with blockchain-verified certificates
+                </p>
                 <button
                   onClick={() => setCurrentPage('home')}
-                  className="bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-bold py-3 px-8 rounded-lg transition-all"
+                  className="bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-bold py-3 px-8 rounded-lg transition-all hover:shadow-lg"
                 >
                   Protect Your First File
                 </button>
@@ -487,13 +497,80 @@ export default function Home() {
           </div>
         )}
 
+        {/* WALLET PAGE */}
+        {currentPage === 'wallet' && (
+          <div className="p-4 md:p-8 max-w-7xl mx-auto">
+            <div className="mb-8">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Wallet</h1>
+              <p className="text-gray-600">Manage your blockchain assets and transactions</p>
+            </div>
+
+            {/* Wallet Balance Card */}
+            <div className="bg-gradient-to-r from-pink-500 via-[#FF8C42] to-yellow-400 rounded-2xl p-8 mb-8 text-white shadow-lg">
+              <div className="mb-4">
+                <div className="text-white/80 text-sm mb-1">Total Balance</div>
+                <div className="text-4xl font-bold">$0.00</div>
+              </div>
+              <div className="flex gap-4 mt-6">
+                <button className="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-semibold py-2 px-6 rounded-lg transition-all">
+                  Deposit
+                </button>
+                <button className="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-semibold py-2 px-6 rounded-lg transition-all">
+                  Withdraw
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
+              <div className="bg-white p-6 rounded-xl shadow-md">
+                <div className="text-gray-500 text-sm mb-2">Blockchain Transactions</div>
+                <div className="text-2xl font-bold text-gray-800">{recordId || 0}</div>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-md">
+                <div className="text-gray-500 text-sm mb-2">Gas Fees Saved</div>
+                <div className="text-2xl font-bold text-gray-800">$0.00</div>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-md">
+                <div className="text-gray-500 text-sm mb-2">NFT Certificates</div>
+                <div className="text-2xl font-bold text-gray-800">{recordId || 0}</div>
+              </div>
+            </div>
+
+            {/* Transaction History */}
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">Transaction History</h2>
+              {blockchainTx ? (
+                <div className="border-b border-gray-200 pb-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="font-semibold text-gray-800">File Protection</div>
+                      <div className="text-sm text-gray-500">Blockchain timestamp created</div>
+                    </div>
+                    <div className="text-green-600 font-semibold">Success</div>
+                  </div>
+                  <div className="font-mono text-xs text-gray-600 bg-gray-50 p-2 rounded break-all">
+                    {blockchainTx}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="text-5xl mb-3">💳</div>
+                  <p className="text-gray-500">No transactions yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* OTHER PAGES - Placeholder */}
-        {['marketplace', 'wallet', 'profile', 'settings', 'about'].includes(currentPage) && (
-          <div className="p-8">
-            <h1 className="text-4xl font-bold text-gray-800 mb-8 capitalize">{currentPage}</h1>
-            <div className="bg-white rounded-xl shadow-md p-16 text-center">
+        {['marketplace', 'profile', 'settings', 'about'].includes(currentPage) && (
+          <div className="p-4 md:p-8 max-w-7xl mx-auto">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-8 capitalize">{currentPage}</h1>
+            <div className="bg-white rounded-xl shadow-md p-12 md:p-16 text-center">
               <div className="text-6xl mb-4">🚧</div>
-              <p className="text-gray-500 text-lg">This section is coming soon!</p>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">Coming Soon</h3>
+              <p className="text-gray-500">This section is under development</p>
             </div>
           </div>
         )}
