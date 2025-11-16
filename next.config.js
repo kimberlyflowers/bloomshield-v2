@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+// Updated CSP configuration for Vercel deployment
 const nextConfig = {
   async headers() {
     return [
