@@ -43,6 +43,15 @@ export default function Home() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Dashboard submenu state
+  const [dashboardSection, setDashboardSection] = useState('overview');
+
+  // Wallet submenu state
+  const [walletSection, setWalletSection] = useState('overview');
+
+  // Wallet card color state
+  const [cardColor, setCardColor] = useState('blush');
+
   // PRESERVED: Supabase client initialization
   const getSupabaseClient = () => {
     if (typeof window === 'undefined') return null;
