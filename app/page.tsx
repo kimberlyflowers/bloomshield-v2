@@ -422,10 +422,10 @@ export default function Home() {
           <div className="p-4 md:p-8 max-w-7xl mx-auto">
             <div className="mb-8">
               <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Dashboard</h1>
-              <p className="text-gray-600">Welcome back! Here's your protection overview.</p>
+              <p className="text-gray-600">Protection overview and theft monitoring</p>
             </div>
 
-            {/* Stats Grid */}
+            {/* Main Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
               <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-l-4 border-[#FF8C42]">
                 <div className="text-gray-500 text-sm font-medium mb-2">Total Protected</div>
@@ -433,19 +433,71 @@ export default function Home() {
                 <div className="text-xs text-gray-400 mt-1">Files secured</div>
               </div>
               <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-l-4 border-blue-500">
-                <div className="text-gray-500 text-sm font-medium mb-2">Monitoring</div>
+                <div className="text-gray-500 text-sm font-medium mb-2">Active Monitoring</div>
                 <div className="text-3xl font-bold text-gray-800">0</div>
-                <div className="text-xs text-gray-400 mt-1">Active scans</div>
+                <div className="text-xs text-gray-400 mt-1">Platform scans</div>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-l-4 border-red-500">
+                <div className="text-gray-500 text-sm font-medium mb-2">Theft Detected</div>
+                <div className="text-3xl font-bold text-gray-800">0</div>
+                <div className="text-xs text-gray-400 mt-1">Matches found</div>
               </div>
               <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-l-4 border-green-500">
                 <div className="text-gray-500 text-sm font-medium mb-2">Open Cases</div>
                 <div className="text-3xl font-bold text-gray-800">0</div>
                 <div className="text-xs text-gray-400 mt-1">Active disputes</div>
               </div>
-              <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-l-4 border-purple-500">
-                <div className="text-gray-500 text-sm font-medium mb-2">Licenses</div>
-                <div className="text-3xl font-bold text-gray-800">0</div>
-                <div className="text-xs text-gray-400 mt-1">Requests pending</div>
+            </div>
+
+            {/* Platform Breakdown */}
+            <div className="bg-white rounded-xl shadow-md p-6 mb-8">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">Platform Monitoring</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { name: 'YouTube', count: 0 },
+                  { name: 'Instagram', count: 0 },
+                  { name: 'SoundCloud', count: 0 },
+                  { name: 'TikTok', count: 0 },
+                  { name: 'Spotify', count: 0 },
+                  { name: 'Facebook', count: 0 },
+                  { name: 'Twitter', count: 0 },
+                  { name: 'Pinterest', count: 0 }
+                ].map((platform) => (
+                  <div key={platform.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      <span className="text-sm font-medium text-gray-700">{platform.name}</span>
+                    </div>
+                    <span className="text-xs text-gray-500">{platform.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* One-Click Actions */}
+            <div className="bg-white rounded-xl shadow-md p-6 mb-8">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">Quick Actions</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  onClick={() => setCurrentPage('home')}
+                  className="flex items-center justify-between p-4 bg-gradient-to-r from-[#FF8C42] to-[#ff7a2e] text-white rounded-lg hover:shadow-lg transition-all"
+                >
+                  <div className="text-left">
+                    <div className="font-semibold">Protect New File</div>
+                    <div className="text-sm text-white/80">Upload and secure content</div>
+                  </div>
+                  <div className="text-2xl">🛡️</div>
+                </button>
+                <button
+                  onClick={() => setCurrentPage('cases')}
+                  className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all"
+                >
+                  <div className="text-left">
+                    <div className="font-semibold">View Cases</div>
+                    <div className="text-sm text-white/80">Manage disputes</div>
+                  </div>
+                  <div className="text-2xl">⚖️</div>
+                </button>
               </div>
             </div>
 
@@ -484,7 +536,7 @@ export default function Home() {
                 <div className="text-6xl mb-4">📁</div>
                 <h3 className="text-xl font-bold text-gray-800 mb-2">No Protected Files Yet</h3>
                 <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                  Start protecting your creative work with blockchain-verified certificates
+                  Start protecting your creative work with blockchain-verified certificates and real-time theft monitoring
                 </p>
                 <button
                   onClick={() => setCurrentPage('home')}
@@ -563,8 +615,132 @@ export default function Home() {
           </div>
         )}
 
+        {/* CASES PAGE - Disputes & Resolution */}
+        {currentPage === 'cases' && (
+          <div className="p-4 md:p-8 max-w-7xl mx-auto">
+            <div className="mb-8">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Active Cases</h1>
+              <p className="text-gray-600">Manage theft cases and dispute resolution</p>
+            </div>
+
+            {/* Case Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
+              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-orange-500">
+                <div className="text-gray-500 text-sm mb-2">Open Cases</div>
+                <div className="text-3xl font-bold text-gray-800">0</div>
+                <div className="text-xs text-gray-400 mt-1">Active disputes</div>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
+                <div className="text-gray-500 text-sm mb-2">In Progress</div>
+                <div className="text-3xl font-bold text-gray-800">0</div>
+                <div className="text-xs text-gray-400 mt-1">Under review</div>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
+                <div className="text-gray-500 text-sm mb-2">Resolved</div>
+                <div className="text-3xl font-bold text-gray-800">0</div>
+                <div className="text-xs text-gray-400 mt-1">Successfully closed</div>
+              </div>
+            </div>
+
+            {/* Takedown Actions */}
+            <div className="bg-white rounded-xl shadow-md p-6 mb-8">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">Quick Takedown Actions</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button className="flex items-center justify-between p-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg transition-all">
+                  <div className="text-left">
+                    <div className="font-semibold">DMCA Takedown</div>
+                    <div className="text-sm text-white/80">Send legal notice</div>
+                  </div>
+                  <div className="text-2xl">📧</div>
+                </button>
+                <button className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all">
+                  <div className="text-left">
+                    <div className="font-semibold">Report Infringement</div>
+                    <div className="text-sm text-white/80">Platform report</div>
+                  </div>
+                  <div className="text-2xl">🚨</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Empty State */}
+            <div className="bg-white rounded-xl shadow-md p-12 text-center">
+              <div className="text-6xl mb-4">⚖️</div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">No Active Cases</h3>
+              <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                Your content is protected. We'll alert you if any infringements are detected.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* MARKETPLACE PAGE */}
+        {currentPage === 'marketplace' && (
+          <div className="p-4 md:p-8 max-w-7xl mx-auto">
+            <div className="mb-8">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Marketplace</h1>
+              <p className="text-gray-600">License your protected content and earn revenue</p>
+            </div>
+
+            {/* Marketplace Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-purple-500">
+                <div className="text-gray-500 text-sm mb-2">Listed Items</div>
+                <div className="text-3xl font-bold text-gray-800">0</div>
+                <div className="text-xs text-gray-400 mt-1">Available for license</div>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
+                <div className="text-gray-500 text-sm mb-2">Active Licenses</div>
+                <div className="text-3xl font-bold text-gray-800">0</div>
+                <div className="text-xs text-gray-400 mt-1">Currently licensed</div>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-yellow-500">
+                <div className="text-gray-500 text-sm mb-2">Pending Requests</div>
+                <div className="text-3xl font-bold text-gray-800">0</div>
+                <div className="text-xs text-gray-400 mt-1">Awaiting approval</div>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
+                <div className="text-gray-500 text-sm mb-2">Total Revenue</div>
+                <div className="text-3xl font-bold text-gray-800">$0</div>
+                <div className="text-xs text-gray-400 mt-1">Lifetime earnings</div>
+              </div>
+            </div>
+
+            {/* List Content */}
+            <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-8 mb-8 text-white shadow-lg">
+              <h2 className="text-2xl font-bold mb-2">List Your Protected Content</h2>
+              <p className="text-white/90 mb-6">Set licensing terms and earn passive income from your creations</p>
+              <button className="bg-white text-purple-600 font-bold py-3 px-8 rounded-lg hover:shadow-lg transition-all">
+                Create Listing
+              </button>
+            </div>
+
+            {/* License Types */}
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">Available License Types</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 transition-all">
+                  <div className="text-2xl mb-2">📄</div>
+                  <div className="font-semibold text-gray-800 mb-1">Personal Use</div>
+                  <div className="text-sm text-gray-500">Non-commercial projects</div>
+                </div>
+                <div className="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 transition-all">
+                  <div className="text-2xl mb-2">💼</div>
+                  <div className="font-semibold text-gray-800 mb-1">Commercial Use</div>
+                  <div className="text-sm text-gray-500">Business & marketing</div>
+                </div>
+                <div className="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 transition-all">
+                  <div className="text-2xl mb-2">🌐</div>
+                  <div className="font-semibold text-gray-800 mb-1">Exclusive Rights</div>
+                  <div className="text-sm text-gray-500">Full ownership transfer</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* OTHER PAGES - Placeholder */}
-        {['marketplace', 'profile', 'settings', 'about'].includes(currentPage) && (
+        {['profile', 'settings'].includes(currentPage) && (
           <div className="p-4 md:p-8 max-w-7xl mx-auto">
             <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-8 capitalize">{currentPage}</h1>
             <div className="bg-white rounded-xl shadow-md p-12 md:p-16 text-center">

@@ -14,11 +14,11 @@ export default function Sidebar({ isActive, onNavigate, currentPage }: SidebarPr
   const navItems = [
     { id: 'home', icon: '⌂', label: 'Home' },
     { id: 'dashboard', icon: '▦', label: 'Dashboard' },
+    { id: 'cases', icon: '⚖', label: 'Cases' },
     { id: 'marketplace', icon: '◘', label: 'Marketplace' },
     { id: 'wallet', icon: '⊞', label: 'Wallet' },
     { id: 'profile', icon: '◉', label: 'Profile' },
     { id: 'settings', icon: '⚙', label: 'Settings' },
-    { id: 'about', icon: 'ⓘ', label: 'About' },
   ];
 
   return (
