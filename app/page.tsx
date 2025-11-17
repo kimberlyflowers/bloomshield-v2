@@ -104,9 +104,9 @@ export default function Home() {
     }
   };
 
-  // PRESERVED: Upload handler with UI enhancements
-  const handleUpload = async () => {
-    if (!selectedFile) return;
+  // PRESERVED: Upload handler with UI enhancements - accepts file directly
+  const handleUploadWithFile = async (fileToUpload: File) => {
+    if (!fileToUpload) return;
 
     try {
       const supabase = getSupabaseClient();
@@ -120,7 +120,7 @@ export default function Home() {
 
       // Step 1: Generate Hashes
       setUploadStatus('Generating protection hashes...');
-      const hashes = await generateHashes(selectedFile);
+      const hashes = await generateHashes(fileToUpload);
       setLegalHash(hashes.legal);
       setContentHash(hashes.content);
       setFloralHash(hashes.floral);
@@ -143,9 +143,9 @@ export default function Home() {
             legalHash: hashes.legal,
             contentHash: hashes.content,
             floralHash: hashes.floral,
-            fileName: selectedFile.name,
-            fileSize: selectedFile.size,
-            mimeType: selectedFile.type,
+            fileName: fileToUpload.name,
+            fileSize: fileToUpload.size,
+            mimeType: fileToUpload.type,
           }),
         });
 
@@ -172,10 +172,10 @@ export default function Home() {
       setUploadStatus('Uploading to secure storage...');
       setProcessingStep(4);
 
-      const fileName = `${hashes.legal.slice(0, 16)}_${Date.now()}_${selectedFile.name}`;
+      const fileName = `${hashes.legal.slice(0, 16)}_${Date.now()}_${fileToUpload.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('protected-files')
-        .upload(fileName, selectedFile);
+        .upload(fileName, fileToUpload);
 
       if (uploadError && !uploadError.message.includes('already exists')) {
         throw uploadError;
@@ -186,9 +186,9 @@ export default function Home() {
       const { data: dbData, error: dbError } = await supabase
         .from('protected_files')
         .insert({
-          file_name: selectedFile.name,
-          file_size: selectedFile.size,
-          mime_type: selectedFile.type,
+          file_name: fileToUpload.name,
+          file_size: fileToUpload.size,
+          mime_type: fileToUpload.type,
           storage_path: uploadData?.path || fileName,
           legal_hash: hashes.legal,
           content_hash: hashes.content,
@@ -206,12 +206,12 @@ export default function Home() {
       await new Promise(resolve => setTimeout(resolve, 1500));
       setProcessingStep(5);
 
-      // Prepare certificate data
+      // Prepare certificate data with actual file information
       const certData = {
         assetId: hashes.floral,
-        fileName: selectedFile.name,
-        fileType: selectedFile.type || 'Unknown',
-        fileSize: `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`,
+        fileName: fileToUpload.name,
+        fileType: fileToUpload.type || 'Unknown',
+        fileSize: `${(fileToUpload.size / 1024 / 1024).toFixed(2)} MB`,
         protectedDate: new Date().toLocaleDateString('en-US', {
           year: 'numeric',
           month: 'short',
@@ -243,6 +243,12 @@ export default function Home() {
     }
   };
 
+  // Legacy upload handler for backward compatibility with button
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+    await handleUploadWithFile(selectedFile);
+  };
+
   // Helper function to show toast
   const showToastMessage = (message: string, type: 'success' | 'warning' | 'error' = 'success') => {
     setToastMessage(message);
@@ -250,12 +256,14 @@ export default function Home() {
     setShowToast(true);
   };
 
-  // Handle file selection
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle file selection - AUTO-START processing
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     setSelectedFile(file);
     if (file) {
       showToastMessage(`Selected: ${file.name}`, 'success');
+      // Auto-start upload process
+      await handleUploadWithFile(file);
     }
   };
 
@@ -403,10 +411,10 @@ export default function Home() {
                   />
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="upload-zone mb-4 cursor-pointer"
+                    className="border-2 border-dashed border-gray-300 hover:border-[#FF8C42] rounded-lg p-8 mb-4 cursor-pointer transition-all hover:bg-orange-50 text-center"
                   >
-                    <div className="upload-icon">📁</div>
-                    <div className="upload-text">
+                    <div className="text-5xl mb-3">📁</div>
+                    <div className="text-gray-600 font-medium">
                       {selectedFile
                         ? `${selectedFile.name} (${(selectedFile.size / 1024 / 1024).toFixed(2)} MB)`
                         : 'Click to choose files or drag & drop'
@@ -414,11 +422,10 @@ export default function Home() {
                     </div>
                   </div>
                   <button
-                    onClick={handleUpload}
-                    disabled={!selectedFile}
-                    className="w-full bg-[#FF8C42] hover:bg-[#ff7a2e] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-2.5 px-6 rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-bold py-2.5 px-6 rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-lg"
                   >
-                    PROTECT FILE
+                    CHOOSE FILES
                   </button>
                 </div>
               </div>
