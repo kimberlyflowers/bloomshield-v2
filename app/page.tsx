@@ -545,6 +545,7 @@ export default function Home() {
           onLogin={handleLogin}
           isLoggedIn={isLoggedIn}
           onToggleSidebar={handleToggleSidebar}
+          onLogoClick={() => setCurrentPage('home')}
         />
 
         {/* Toast Notification */}
@@ -561,7 +562,7 @@ export default function Home() {
             <div className="w-full max-w-6xl">
               {/* Title */}
               <div className="text-center mb-8 md:mb-12">
-                <h1 className="text-4xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-pink-500 via-[#FF8C42] to-yellow-400 bg-clip-text text-transparent">
+                <h1 className="text-4xl md:text-6xl font-bold mb-4 text-[#FF8C42]">
                   BloomShield
                 </h1>
                 <p className="text-lg md:text-xl text-gray-600 px-4">
@@ -735,7 +736,7 @@ export default function Home() {
                             setShowCertificate(true);
                           }}
                         >
-                          <div className="w-full h-48 flex items-center justify-center text-6xl bg-gradient-to-br from-pink-200 to-orange-300">
+                          <div className="w-full h-48 flex items-center justify-center text-6xl bg-[#E8E8E8]">
                             {getFileIcon(file.fileType)}
                           </div>
                           <div className="p-5">
@@ -779,7 +780,7 @@ export default function Home() {
                             setShowCertificate(true);
                           }}
                         >
-                          <div className="w-full h-48 flex items-center justify-center text-6xl bg-gradient-to-br from-pink-200 to-orange-300">
+                          <div className="w-full h-48 flex items-center justify-center text-6xl bg-[#E8E8E8]">
                             {getFileIcon(file.fileType)}
                           </div>
                           <div className="p-5">
@@ -805,7 +806,7 @@ export default function Home() {
                 <div>
                   <h1 className="text-4xl font-bold text-gray-800 mb-8">Monitoring</h1>
 
-                  <div className="bg-gradient-to-r from-pink-500 via-[#FF8C42] to-yellow-400 rounded-2xl p-12 text-center text-white shadow-lg">
+                  <div className="bg-[#FFB8A3] rounded-2xl p-12 text-center text-white shadow-lg">
                     <h3 className="text-3xl font-bold mb-4">🔍 Unlock Advanced Monitoring</h3>
                     <p className="text-xl mb-8 opacity-95">Track your content across the web and get alerts when copies are detected</p>
                     <button
@@ -823,7 +824,7 @@ export default function Home() {
                 <div>
                   <h1 className="text-4xl font-bold text-gray-800 mb-8">Cases</h1>
 
-                  <div className="bg-gradient-to-r from-pink-500 via-[#FF8C42] to-yellow-400 rounded-2xl p-12 text-center text-white shadow-lg">
+                  <div className="bg-[#FFB8A3] rounded-2xl p-12 text-center text-white shadow-lg">
                     <h3 className="text-3xl font-bold mb-4">⚖️ Unlock Case Management</h3>
                     <p className="text-xl mb-8 opacity-95">Manage infringement cases and work with legal partners to protect your rights</p>
                     <button
@@ -1121,12 +1122,12 @@ export default function Home() {
             </div>
 
             {/* List Content */}
-            <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-8 mb-8 text-white shadow-lg">
+            <div className="bg-[#FFB8A3] rounded-2xl p-8 mb-8 text-white shadow-lg">
               <h2 className="text-2xl font-bold mb-2">List Your Protected Content</h2>
               <p className="text-white/90 mb-6">Set licensing terms and earn passive income from your creations</p>
               <button
                 onClick={handleCreateListing}
-                className="bg-white text-purple-600 font-bold py-3 px-8 rounded-lg hover:shadow-lg transition-all"
+                className="bg-white text-[#FF8C42] font-bold py-3 px-8 rounded-lg hover:shadow-lg transition-all"
               >
                 Create Listing
               </button>
@@ -1170,7 +1171,7 @@ export default function Home() {
               />
               <div
                 onClick={() => profilePhotoInputRef.current?.click()}
-                className="w-32 h-32 mx-auto mb-4 rounded-full bg-gradient-to-br from-pink-200 to-orange-300 flex items-center justify-center text-6xl cursor-pointer hover:opacity-80 transition-all overflow-hidden"
+                className="w-32 h-32 mx-auto mb-4 rounded-full bg-[#E8E8E8] flex items-center justify-center text-6xl cursor-pointer hover:opacity-80 transition-all overflow-hidden"
                 style={{
                   backgroundImage: profileData.profilePhoto.startsWith('data:') ? `url(${profileData.profilePhoto})` : 'none',
                   backgroundSize: 'cover',
