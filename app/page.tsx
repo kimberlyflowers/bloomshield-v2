@@ -6,12 +6,18 @@ import TopBar from '@/components/TopBar';
 import Toast from '@/components/Toast';
 import CertificateModal from '@/components/CertificateModal';
 import ProcessingOverlay from '@/components/ProcessingOverlay';
-import LoginModal from '@/components/LoginModal';
+import AuthModal from '@/components/AuthModal';
+import { onAuthStateChange, logout, generateUserWallet } from '@/lib/auth';
+import { UserProfile } from '@/types/user';
 
 export default function Home() {
+  // Auth state
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+
   // Page navigation state
   const [currentPage, setCurrentPage] = useState('home');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isSidebarActive, setIsSidebarActive] = useState(false);
 
   // Toast state
@@ -100,12 +106,6 @@ export default function Home() {
         }
       }
 
-      // Load wallet data
-      const wallet = localStorage.getItem('userWallet');
-      if (wallet) {
-        setUserWallet(JSON.parse(wallet));
-      }
-
       // Load 2FA status
       const twoFA = localStorage.getItem('twoFactorEnabled');
       if (twoFA === 'true') {
@@ -118,6 +118,52 @@ export default function Home() {
         setApiKeys(JSON.parse(keys));
       }
     }
+  }, []);
+
+  // Auth state listener
+  useEffect(() => {
+    const { data: { subscription } } = onAuthStateChange((user) => {
+      setCurrentUser(user);
+      setIsLoggedIn(!!user);
+      setAuthLoading(false);
+
+      if (user) {
+        // Load user's wallet from their profile
+        setUserWallet({
+          address: user.walletAddress,
+          seedPhrase: user.walletSeedPhrase
+        });
+
+        // Update profile data from user
+        setProfileData({
+          fullName: user.name,
+          email: user.email,
+          phone: user.phone || '',
+          bio: user.bio || '',
+          businessEnabled: !!user.businessName,
+          businessName: user.businessName || '',
+          companyWebsite: user.businessWebsite || '',
+          industry: user.industry || '',
+          taxId: '',
+          portfolioWebsite: user.socialLinks?.website || '',
+          instagram: user.socialLinks?.instagram || '',
+          twitter: user.socialLinks?.twitter || '',
+          linkedin: '',
+          other: '',
+          accountType: user.accountType,
+          memberSince: new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+          profilePhoto: user.profilePhoto || '👤'
+        });
+
+        // Load 2FA status from user profile
+        setTwoFactorEnabled(user.twoFactorEnabled);
+      } else {
+        setUserWallet(null);
+        setAuthLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   // PRESERVED: Supabase client initialization
@@ -422,59 +468,42 @@ export default function Home() {
     showToastMessage(`❌ No results found for: ${searchQuery}`, 'warning');
   };
 
-  // Handle login button click - show modal
+  // Handle login button click - show auth modal
   const handleLogin = () => {
     setShowLoginModal(true);
   };
 
-  // Generate user wallet on first login
-  const generateUserWallet = () => {
-    // Generate wallet address
-    const address = '0x' + Array.from({length: 40}, () =>
-      '0123456789abcdef'[Math.floor(Math.random() * 16)]
-    ).join('');
+  // Handle successful login
+  const handleLoginSuccess = (user: UserProfile) => {
+    showToastMessage(`🔐 Welcome back, ${user.name}!`, 'success');
+    setCurrentPage('dashboard');
 
-    // Generate 12-word seed phrase
-    const wordList = ['abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract', 'absurd', 'abuse', 'access', 'accident', 'account', 'accuse', 'achieve', 'acid', 'acoustic', 'acquire', 'across', 'act', 'action', 'actor', 'actress', 'actual', 'adapt', 'add', 'addict', 'address', 'adjust', 'admit', 'adult', 'advance', 'advice', 'aerobic', 'affair', 'afford', 'afraid', 'again', 'age', 'agent', 'agree', 'ahead', 'aim', 'air', 'airport', 'aisle', 'alarm', 'album', 'alcohol', 'alert', 'alien', 'all', 'alley', 'allow', 'almost', 'alone', 'alpha', 'already', 'also', 'alter', 'always', 'amateur', 'amazing', 'among', 'amount', 'amused', 'analyst', 'anchor', 'ancient', 'anger', 'angle', 'angry', 'animal', 'ankle', 'announce', 'annual', 'another', 'answer', 'antenna', 'antique', 'anxiety', 'any', 'apart', 'apology', 'appear', 'apple', 'approve', 'april', 'arch', 'arctic', 'area', 'arena', 'argue', 'arm', 'armed', 'armor', 'army', 'around', 'arrange', 'arrest', 'arrive', 'arrow', 'art', 'artefact', 'artist', 'artwork', 'ask', 'aspect', 'assault', 'asset', 'assist', 'assume', 'asthma', 'athlete', 'atom', 'attack', 'attend', 'attitude', 'attract', 'auction', 'audit', 'august', 'aunt', 'author', 'auto', 'autumn', 'average', 'avocado', 'avoid', 'awake', 'aware', 'away', 'awesome', 'awful', 'awkward', 'axis', 'baby', 'bachelor', 'bacon', 'badge', 'bag', 'balance', 'balcony', 'ball', 'bamboo', 'banana', 'banner', 'bar', 'barely', 'bargain', 'barrel', 'base', 'basic', 'basket', 'battle', 'beach', 'bean', 'beauty', 'because', 'become', 'beef', 'before', 'begin', 'behave', 'behind', 'believe', 'below', 'belt', 'bench', 'benefit', 'best', 'betray', 'better', 'between', 'beyond', 'bicycle', 'bid', 'bike', 'bind', 'biology', 'bird', 'birth', 'bitter', 'black', 'blade', 'blame', 'blanket', 'blast', 'bleak', 'bless', 'blind', 'blood', 'blossom', 'blouse', 'blue', 'blur', 'blush', 'board', 'boat', 'body', 'boil', 'bomb', 'bone', 'bonus', 'book', 'boost', 'border', 'boring', 'borrow', 'boss', 'bottom', 'bounce', 'box', 'boy', 'bracket', 'brain', 'brand', 'brass', 'brave', 'bread', 'breeze', 'brick', 'bridge', 'brief', 'bright', 'bring', 'brisk', 'broccoli', 'broken', 'bronze', 'broom', 'brother', 'brown', 'brush', 'bubble', 'buddy', 'budget', 'buffalo', 'build', 'bulb', 'bulk', 'bullet', 'bundle', 'bunker', 'burden', 'burger', 'burst', 'bus', 'business', 'busy', 'butter', 'buyer', 'buzz'];
-
-    const seedPhrase = [];
-    for (let i = 0; i < 12; i++) {
-      seedPhrase.push(wordList[Math.floor(Math.random() * wordList.length)]);
+    // Check if user needs to see seed phrase modal
+    if (typeof window !== 'undefined') {
+      const seedPhraseAck = localStorage.getItem('seedPhraseAcknowledged');
+      if (!seedPhraseAck) {
+        setTimeout(() => setShowSeedPhraseModal(true), 1000);
+      }
     }
-
-    return {
-      address: address,
-      seedPhrase: seedPhrase.join(' ')
-    };
   };
 
-  // Handle actual login after method selection
-  const handleLoginComplete = (method: 'google' | 'email' | 'facebook') => {
-    setIsLoggedIn(true);
+  // Handle successful signup
+  const handleSignUpSuccess = (userId: string) => {
+    // Success message is shown in modal
+    // User will need to verify email before logging in
+  };
 
-    const methodNames = {
-      google: 'Google',
-      email: 'Email',
-      facebook: 'Facebook'
-    };
-
-    showToastMessage(`🔐 Logged in with ${methodNames[method]}! Welcome to BloomShield`, 'success');
-
-    // Initialize wallet on first login
-    if (typeof window !== 'undefined') {
-      const existingWallet = localStorage.getItem('userWallet');
-      const seedPhraseAck = localStorage.getItem('seedPhraseAcknowledged');
-
-      if (!existingWallet) {
-        const wallet = generateUserWallet();
-        localStorage.setItem('userWallet', JSON.stringify(wallet));
-        setUserWallet(wallet);
-
-        // Show seed phrase modal only if not acknowledged before
-        if (!seedPhraseAck) {
-          setTimeout(() => setShowSeedPhraseModal(true), 1000);
-        }
-      }
+  // Handle logout
+  const handleLogout = async () => {
+    const result = await logout();
+    if (result.success) {
+      setCurrentUser(null);
+      setIsLoggedIn(false);
+      setUserWallet(null);
+      setCurrentPage('home');
+      showToastMessage('✅ Logged out successfully', 'success');
+    } else {
+      showToastMessage('❌ Error logging out', 'error');
     }
   };
 
@@ -2178,11 +2207,12 @@ export default function Home() {
         onComplete={handleProcessingComplete}
       />
 
-      {/* Login Modal */}
-      <LoginModal
+      {/* Auth Modal (Login/Signup/Reset) */}
+      <AuthModal
         show={showLoginModal}
         onClose={() => setShowLoginModal(false)}
-        onLogin={handleLoginComplete}
+        onLoginSuccess={handleLoginSuccess}
+        onSignUpSuccess={handleSignUpSuccess}
       />
 
       {/* Change Password Modal */}
