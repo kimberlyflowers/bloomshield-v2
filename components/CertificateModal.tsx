@@ -12,6 +12,8 @@ interface CertificateData {
   contentHash: string;
   floralHash: string;
   blockchainTx: string;
+  ownerWallet?: string;
+  ipfsHash?: string;
 }
 
 interface CertificateModalProps {
@@ -206,6 +208,43 @@ Thank you!`
               </div>
             </div>
           </div>
+
+          {/* Blockchain Record Section */}
+          {(data.ownerWallet || data.ipfsHash) && (
+            <div className="mb-8">
+              <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Blockchain Record</div>
+              <div className="bg-gray-50 p-6 rounded-lg space-y-4">
+                {data.ownerWallet && (
+                  <div>
+                    <div className="text-xs text-gray-500 mb-2 font-semibold">Owner Wallet</div>
+                    <code className="text-xs font-mono text-gray-800 break-all bg-white p-3 rounded block">
+                      {data.ownerWallet}
+                    </code>
+                  </div>
+                )}
+                <div>
+                  <div className="text-xs text-gray-500 mb-2 font-semibold">Blockchain Transaction</div>
+                  <code className="text-xs font-mono text-gray-800 break-all bg-white p-3 rounded block">
+                    {data.blockchainTx}
+                  </code>
+                </div>
+                {data.ipfsHash && (
+                  <div>
+                    <div className="text-xs text-gray-500 mb-2 font-semibold">Metadata (IPFS)</div>
+                    <code className="text-xs font-mono text-gray-800 break-all bg-white p-3 rounded block">
+                      {data.ipfsHash}
+                    </code>
+                  </div>
+                )}
+              </div>
+              <div className="bg-[#E8F5E9] border-l-4 border-green-500 p-4 rounded-lg mt-4">
+                <p className="text-sm font-semibold text-gray-800 mb-1">✓ Permanent Protection</p>
+                <p className="text-xs text-gray-700">
+                  This proof exists on the blockchain forever, independent of BloomShield.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Protection Stamp */}
           <div

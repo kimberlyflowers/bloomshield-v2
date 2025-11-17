@@ -79,6 +79,14 @@ export default function Home() {
   // Protected files state (for My Files dashboard section)
   const [protectedFiles, setProtectedFiles] = useState<any[]>([]);
 
+  // Settings page state
+  const [settingsSection, setSettingsSection] = useState('account');
+  const [showSeedPhraseModal, setShowSeedPhraseModal] = useState(false);
+  const [userWallet, setUserWallet] = useState<any>(null);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [show2FASetup, setShow2FASetup] = useState(false);
+  const [apiKeys, setApiKeys] = useState<any[]>([]);
+
   // Load protected files from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -90,6 +98,24 @@ export default function Home() {
         } catch (error) {
           console.error('Error loading protected files:', error);
         }
+      }
+
+      // Load wallet data
+      const wallet = localStorage.getItem('userWallet');
+      if (wallet) {
+        setUserWallet(JSON.parse(wallet));
+      }
+
+      // Load 2FA status
+      const twoFA = localStorage.getItem('twoFactorEnabled');
+      if (twoFA === 'true') {
+        setTwoFactorEnabled(true);
+      }
+
+      // Load API keys
+      const keys = localStorage.getItem('apiKeys');
+      if (keys) {
+        setApiKeys(JSON.parse(keys));
       }
     }
   }, []);
@@ -248,23 +274,30 @@ export default function Home() {
       await new Promise(resolve => setTimeout(resolve, 1500));
       setProcessingStep(5);
 
-      // Prepare certificate data with actual file information
+      // Get wallet info
+      const walletData = typeof window !== 'undefined' ? localStorage.getItem('userWallet') : null;
+      const wallet = walletData ? JSON.parse(walletData) : null;
+
+      // Generate IPFS hash (simulated)
+      const ipfsHash = 'Qm' + Array.from({length: 44}, () =>
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 62)]
+      ).join('');
+
+      // Prepare certificate data with actual file information + blockchain info
       const certData = {
         assetId: hashes.floral,
         fileName: fileToUpload.name,
         fileType: fileToUpload.type || 'Unknown',
         fileSize: `${(fileToUpload.size / 1024 / 1024).toFixed(2)} MB`,
-        protectedDate: new Date().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        }),
+        protectedDate: new Date().toISOString(),
         creator: 'User', // This would come from auth in production
         email: 'user@example.com', // This would come from auth in production
         legalHash: hashes.legal,
         contentHash: hashes.content,
         floralHash: hashes.floral,
         blockchainTx: blockchainTransactionHash,
+        ownerWallet: wallet?.address || 'No wallet',
+        ipfsHash: ipfsHash,
       };
       setCertificateData(certData);
 
@@ -394,11 +427,30 @@ export default function Home() {
     setShowLoginModal(true);
   };
 
+  // Generate user wallet on first login
+  const generateUserWallet = () => {
+    // Generate wallet address
+    const address = '0x' + Array.from({length: 40}, () =>
+      '0123456789abcdef'[Math.floor(Math.random() * 16)]
+    ).join('');
+
+    // Generate 12-word seed phrase
+    const wordList = ['abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract', 'absurd', 'abuse', 'access', 'accident', 'account', 'accuse', 'achieve', 'acid', 'acoustic', 'acquire', 'across', 'act', 'action', 'actor', 'actress', 'actual', 'adapt', 'add', 'addict', 'address', 'adjust', 'admit', 'adult', 'advance', 'advice', 'aerobic', 'affair', 'afford', 'afraid', 'again', 'age', 'agent', 'agree', 'ahead', 'aim', 'air', 'airport', 'aisle', 'alarm', 'album', 'alcohol', 'alert', 'alien', 'all', 'alley', 'allow', 'almost', 'alone', 'alpha', 'already', 'also', 'alter', 'always', 'amateur', 'amazing', 'among', 'amount', 'amused', 'analyst', 'anchor', 'ancient', 'anger', 'angle', 'angry', 'animal', 'ankle', 'announce', 'annual', 'another', 'answer', 'antenna', 'antique', 'anxiety', 'any', 'apart', 'apology', 'appear', 'apple', 'approve', 'april', 'arch', 'arctic', 'area', 'arena', 'argue', 'arm', 'armed', 'armor', 'army', 'around', 'arrange', 'arrest', 'arrive', 'arrow', 'art', 'artefact', 'artist', 'artwork', 'ask', 'aspect', 'assault', 'asset', 'assist', 'assume', 'asthma', 'athlete', 'atom', 'attack', 'attend', 'attitude', 'attract', 'auction', 'audit', 'august', 'aunt', 'author', 'auto', 'autumn', 'average', 'avocado', 'avoid', 'awake', 'aware', 'away', 'awesome', 'awful', 'awkward', 'axis', 'baby', 'bachelor', 'bacon', 'badge', 'bag', 'balance', 'balcony', 'ball', 'bamboo', 'banana', 'banner', 'bar', 'barely', 'bargain', 'barrel', 'base', 'basic', 'basket', 'battle', 'beach', 'bean', 'beauty', 'because', 'become', 'beef', 'before', 'begin', 'behave', 'behind', 'believe', 'below', 'belt', 'bench', 'benefit', 'best', 'betray', 'better', 'between', 'beyond', 'bicycle', 'bid', 'bike', 'bind', 'biology', 'bird', 'birth', 'bitter', 'black', 'blade', 'blame', 'blanket', 'blast', 'bleak', 'bless', 'blind', 'blood', 'blossom', 'blouse', 'blue', 'blur', 'blush', 'board', 'boat', 'body', 'boil', 'bomb', 'bone', 'bonus', 'book', 'boost', 'border', 'boring', 'borrow', 'boss', 'bottom', 'bounce', 'box', 'boy', 'bracket', 'brain', 'brand', 'brass', 'brave', 'bread', 'breeze', 'brick', 'bridge', 'brief', 'bright', 'bring', 'brisk', 'broccoli', 'broken', 'bronze', 'broom', 'brother', 'brown', 'brush', 'bubble', 'buddy', 'budget', 'buffalo', 'build', 'bulb', 'bulk', 'bullet', 'bundle', 'bunker', 'burden', 'burger', 'burst', 'bus', 'business', 'busy', 'butter', 'buyer', 'buzz'];
+
+    const seedPhrase = [];
+    for (let i = 0; i < 12; i++) {
+      seedPhrase.push(wordList[Math.floor(Math.random() * wordList.length)]);
+    }
+
+    return {
+      address: address,
+      seedPhrase: seedPhrase.join(' ')
+    };
+  };
+
   // Handle actual login after method selection
   const handleLoginComplete = (method: 'google' | 'email' | 'facebook') => {
     setIsLoggedIn(true);
-    // Don't auto-navigate - stay on current page
-    // Don't auto-open sidebar - let user open it via hamburger menu
 
     const methodNames = {
       google: 'Google',
@@ -407,6 +459,23 @@ export default function Home() {
     };
 
     showToastMessage(`🔐 Logged in with ${methodNames[method]}! Welcome to BloomShield`, 'success');
+
+    // Initialize wallet on first login
+    if (typeof window !== 'undefined') {
+      const existingWallet = localStorage.getItem('userWallet');
+      const seedPhraseAck = localStorage.getItem('seedPhraseAcknowledged');
+
+      if (!existingWallet) {
+        const wallet = generateUserWallet();
+        localStorage.setItem('userWallet', JSON.stringify(wallet));
+        setUserWallet(wallet);
+
+        // Show seed phrase modal only if not acknowledged before
+        if (!seedPhraseAck) {
+          setTimeout(() => setShowSeedPhraseModal(true), 1000);
+        }
+      }
+    }
   };
 
   // Handle navigation
@@ -1483,14 +1552,188 @@ export default function Home() {
           </div>
         )}
 
-        {/* SETTINGS PAGE - Placeholder */}
+        {/* SETTINGS PAGE */}
         {currentPage === 'settings' && (
-          <div className="p-4 md:p-8 max-w-7xl mx-auto">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-8">Settings</h1>
-            <div className="bg-white rounded-xl shadow-md p-12 md:p-16 text-center">
-              <div className="text-6xl mb-4">🚧</div>
-              <h3 className="text-xl font-bold text-gray-800 mb-2">Coming Soon</h3>
-              <p className="text-gray-500">This section is under development</p>
+          <div className="flex h-[calc(100vh-70px)] bg-gray-50">
+            {/* Settings Submenu */}
+            <div className="w-60 bg-white border-r border-gray-200 p-8 overflow-y-auto">
+              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Settings</h2>
+              <nav className="space-y-1">
+                <button
+                  onClick={() => setSettingsSection('account')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    settingsSection === 'account'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  Account
+                </button>
+                <button
+                  onClick={() => setSettingsSection('wallet')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    settingsSection === 'wallet'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  Ownership Wallet
+                </button>
+                <button
+                  onClick={() => setSettingsSection('security')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    settingsSection === 'security'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  Security
+                </button>
+                <button
+                  onClick={() => setSettingsSection('privacy')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    settingsSection === 'privacy'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  Privacy
+                </button>
+              </nav>
+            </div>
+
+            {/* Settings Main Content */}
+            <div className="flex-1 overflow-y-auto p-8">
+              {/* ACCOUNT SECTION */}
+              {settingsSection === 'account' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Account Settings</h1>
+                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Profile Information</h3>
+                    <p className="text-gray-600">Manage your account details and preferences.</p>
+                    <button
+                      onClick={() => setCurrentPage('profile')}
+                      className="mt-4 bg-[#FF8C42] text-white px-6 py-2 rounded-lg hover:bg-[#ff7a2e] transition-all"
+                    >
+                      Go to Profile →
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* OWNERSHIP WALLET SECTION */}
+              {settingsSection === 'wallet' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-4">Ownership Wallet</h1>
+                  <p className="text-gray-600 mb-8">Your permanent proof of ownership on the blockchain</p>
+
+                  {/* Wallet Address Card */}
+                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Your Wallet Address</h3>
+                    <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                      <code className="text-sm font-mono text-gray-800 break-all">
+                        {userWallet?.address || 'No wallet generated yet'}
+                      </code>
+                    </div>
+                    {userWallet && (
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(userWallet.address);
+                          showToastMessage('📋 Wallet address copied!', 'success');
+                        }}
+                        className="bg-[#FF8C42] text-white px-6 py-2 rounded-lg hover:bg-[#ff7a2e] transition-all"
+                      >
+                        📋 Copy Address
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Recovery Phrase Card */}
+                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Recovery Phrase</h3>
+                    <div className="bg-[#FFF5F0] border-2 border-[#FF8C42] p-4 rounded-lg mb-4">
+                      <p className="text-[#FF8C42] font-semibold mb-2">⚠️ CRITICAL: Keep This Safe</p>
+                      <p className="text-gray-700 text-sm">
+                        Your 12-word recovery phrase is the ONLY way to prove ownership if BloomShield shuts down.
+                        Never share it with anyone.
+                      </p>
+                    </div>
+                    {userWallet && (
+                      <button
+                        onClick={() => {
+                          const confirmed = confirm(
+                            '⚠️ WARNING: Never share your recovery phrase with anyone!\n\n' +
+                            'Anyone with this phrase can claim ownership of all your protected work.\n\n' +
+                            'Click OK to view your recovery phrase.'
+                          );
+                          if (confirmed) {
+                            alert(`Your Recovery Phrase:\n\n${userWallet.seedPhrase}\n\nStore this safely offline!`);
+                          }
+                        }}
+                        className="bg-white border-2 border-[#FF8C42] text-[#FF8C42] px-6 py-2 rounded-lg hover:bg-orange-50 transition-all"
+                      >
+                        🔑 View Recovery Phrase
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Protected Assets Card */}
+                  <div className="bg-white rounded-xl shadow-md p-6">
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Protected Assets</h3>
+                    {protectedFiles.length === 0 ? (
+                      <p className="text-gray-500">No protected assets yet</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {protectedFiles.map((file, index) => (
+                          <div
+                            key={index}
+                            className="bg-gray-50 p-4 rounded-lg flex justify-between items-center"
+                          >
+                            <div>
+                              <p className="font-semibold text-gray-800">{file.fileName}</p>
+                              <p className="text-gray-500 text-sm font-mono">{file.assetId}</p>
+                            </div>
+                            <span className="text-green-600 text-sm font-semibold">● Protected</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Blockchain Info */}
+                  <div className="bg-[#E8F5E9] border-l-4 border-green-500 p-6 rounded-lg mt-6">
+                    <h4 className="font-semibold text-gray-800 mb-2">✓ Permanent Protection</h4>
+                    <p className="text-gray-700 text-sm">
+                      Your ownership records exist on the blockchain forever, completely independent of BloomShield.
+                      Even if our service disappears, your proof of ownership remains permanent and verifiable.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* SECURITY SECTION - Placeholder */}
+              {settingsSection === 'security' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Security</h1>
+                  <div className="bg-white rounded-xl shadow-md p-12 text-center">
+                    <div className="text-6xl mb-4">🔒</div>
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">Security Settings</h3>
+                    <p className="text-gray-500">2FA, password management, and session control coming soon</p>
+                  </div>
+                </div>
+              )}
+
+              {/* PRIVACY SECTION - Placeholder */}
+              {settingsSection === 'privacy' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Privacy</h1>
+                  <div className="bg-white rounded-xl shadow-md p-12 text-center">
+                    <div className="text-6xl mb-4">🔐</div>
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">Privacy Settings</h3>
+                    <p className="text-gray-500">Privacy controls and data management coming soon</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1561,6 +1804,84 @@ export default function Home() {
                 Change Password
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Seed Phrase Modal - Shows on first login */}
+      {showSeedPhraseModal && userWallet && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[3000] p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl">
+            <div className="text-center mb-6">
+              <div className="text-6xl mb-4">🔑</div>
+              <h2 className="text-3xl font-bold text-gray-800 mb-2">Your Ownership Wallet Created</h2>
+              <p className="text-gray-600">This is your permanent proof of ownership</p>
+            </div>
+
+            <div className="bg-[#FFF5F0] border-2 border-[#FF8C42] p-4 rounded-lg mb-6">
+              <p className="text-[#FF8C42] font-semibold mb-2">⚠️ CRITICAL: Save This Recovery Phrase</p>
+              <p className="text-gray-700 text-sm">
+                This is the ONLY way to prove ownership if BloomShield ever shuts down. We cannot recover it for you.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 p-6 rounded-lg mb-6">
+              <p className="text-gray-500 text-sm mb-4">Your 12-word recovery phrase:</p>
+              <div className="bg-white p-4 rounded-lg mb-4">
+                <code className="font-mono text-base text-gray-800 break-words leading-loose">
+                  {userWallet.seedPhrase}
+                </code>
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(userWallet.seedPhrase);
+                  showToastMessage('📋 Recovery phrase copied!', 'success');
+                }}
+                className="w-full bg-white border-2 border-[#FF8C42] text-[#FF8C42] py-3 rounded-lg font-semibold hover:bg-orange-50 transition-all"
+              >
+                📋 Copy to Clipboard
+              </button>
+            </div>
+
+            <div className="bg-[#E8F5E9] border-l-4 border-green-500 p-4 rounded-lg mb-6">
+              <p className="font-semibold text-gray-800 mb-2">✓ Why This Matters:</p>
+              <p className="text-gray-700 text-sm">
+                Even if BloomShield disappears, your blockchain records remain forever. This phrase is your key to prove
+                ownership of all your protected work.
+              </p>
+            </div>
+
+            <div className="mb-6">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-5 h-5 mr-3 cursor-pointer accent-[#FF8C42]"
+                  onChange={(e) => {
+                    const btn = document.getElementById('confirmSeedBtn') as HTMLButtonElement;
+                    if (btn) {
+                      btn.disabled = !e.target.checked;
+                      btn.className = e.target.checked
+                        ? 'w-full bg-[#FF8C42] text-white py-4 rounded-lg font-bold text-lg cursor-pointer hover:bg-[#ff7a2e] transition-all'
+                        : 'w-full bg-gray-300 text-white py-4 rounded-lg font-bold text-lg cursor-not-allowed';
+                    }
+                  }}
+                />
+                <span className="text-gray-700">I have written down my recovery phrase in a safe place</span>
+              </label>
+            </div>
+
+            <button
+              id="confirmSeedBtn"
+              disabled
+              onClick={() => {
+                localStorage.setItem('seedPhraseAcknowledged', 'true');
+                setShowSeedPhraseModal(false);
+                showToastMessage('✅ Wallet created! Your ownership is now permanent.', 'success');
+              }}
+              className="w-full bg-gray-300 text-white py-4 rounded-lg font-bold text-lg cursor-not-allowed"
+            >
+              Continue to Dashboard
+            </button>
           </div>
         </div>
       )}
