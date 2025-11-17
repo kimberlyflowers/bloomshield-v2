@@ -6,12 +6,18 @@ import TopBar from '@/components/TopBar';
 import Toast from '@/components/Toast';
 import CertificateModal from '@/components/CertificateModal';
 import ProcessingOverlay from '@/components/ProcessingOverlay';
-import LoginModal from '@/components/LoginModal';
+import AuthModal from '@/components/AuthModal';
+import { onAuthStateChange, logout, generateUserWallet } from '@/lib/auth';
+import { UserProfile } from '@/types/user';
 
 export default function Home() {
+  // Auth state
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+
   // Page navigation state
   const [currentPage, setCurrentPage] = useState('home');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isSidebarActive, setIsSidebarActive] = useState(false);
 
   // Toast state
@@ -87,7 +93,21 @@ export default function Home() {
   const [show2FASetup, setShow2FASetup] = useState(false);
   const [apiKeys, setApiKeys] = useState<any[]>([]);
 
-  // Load protected files from localStorage on mount
+  // Marketplace state
+  const [marketplaceAssets, setMarketplaceAssets] = useState<any[]>([]);
+  const [marketplaceSearchQuery, setMarketplaceSearchQuery] = useState('');
+  const [marketplaceFilters, setMarketplaceFilters] = useState({
+    type: 'all',
+    license: 'all',
+    price: 'all',
+    sort: 'newest'
+  });
+  const [selectedAsset, setSelectedAsset] = useState<any>(null);
+  const [showAssetDetail, setShowAssetDetail] = useState(false);
+  const [showListingModal, setShowListingModal] = useState(false);
+  const [assetToList, setAssetToList] = useState<any>(null);
+
+  // Load protected files and marketplace assets from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedFiles = localStorage.getItem('protectedFiles');
@@ -95,15 +115,13 @@ export default function Home() {
         try {
           const files = JSON.parse(savedFiles);
           setProtectedFiles(files);
+
+          // Load marketplace listings (filter files marked as listed)
+          const listedAssets = files.filter((file: any) => file.isListed);
+          setMarketplaceAssets(listedAssets);
         } catch (error) {
           console.error('Error loading protected files:', error);
         }
-      }
-
-      // Load wallet data
-      const wallet = localStorage.getItem('userWallet');
-      if (wallet) {
-        setUserWallet(JSON.parse(wallet));
       }
 
       // Load 2FA status
@@ -118,6 +136,52 @@ export default function Home() {
         setApiKeys(JSON.parse(keys));
       }
     }
+  }, []);
+
+  // Auth state listener
+  useEffect(() => {
+    const { data: { subscription } } = onAuthStateChange((user) => {
+      setCurrentUser(user);
+      setIsLoggedIn(!!user);
+      setAuthLoading(false);
+
+      if (user) {
+        // Load user's wallet from their profile
+        setUserWallet({
+          address: user.walletAddress,
+          seedPhrase: user.walletSeedPhrase
+        });
+
+        // Update profile data from user
+        setProfileData({
+          fullName: user.name,
+          email: user.email,
+          phone: user.phone || '',
+          bio: user.bio || '',
+          businessEnabled: !!user.businessName,
+          businessName: user.businessName || '',
+          companyWebsite: user.businessWebsite || '',
+          industry: user.industry || '',
+          taxId: '',
+          portfolioWebsite: user.socialLinks?.website || '',
+          instagram: user.socialLinks?.instagram || '',
+          twitter: user.socialLinks?.twitter || '',
+          linkedin: '',
+          other: '',
+          accountType: user.accountType,
+          memberSince: new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+          profilePhoto: user.profilePhoto || '👤'
+        });
+
+        // Load 2FA status from user profile
+        setTwoFactorEnabled(user.twoFactorEnabled);
+      } else {
+        setUserWallet(null);
+        setAuthLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   // PRESERVED: Supabase client initialization
@@ -422,60 +486,287 @@ export default function Home() {
     showToastMessage(`❌ No results found for: ${searchQuery}`, 'warning');
   };
 
-  // Handle login button click - show modal
+  // Handle login button click - show auth modal
   const handleLogin = () => {
     setShowLoginModal(true);
   };
 
-  // Generate user wallet on first login
-  const generateUserWallet = () => {
-    // Generate wallet address
-    const address = '0x' + Array.from({length: 40}, () =>
+  // Handle successful login
+  const handleLoginSuccess = (user: UserProfile) => {
+    showToastMessage(`🔐 Welcome back, ${user.name}!`, 'success');
+    setCurrentPage('dashboard');
+
+    // Check if user needs to see seed phrase modal
+    if (typeof window !== 'undefined') {
+      const seedPhraseAck = localStorage.getItem('seedPhraseAcknowledged');
+      if (!seedPhraseAck) {
+        setTimeout(() => setShowSeedPhraseModal(true), 1000);
+      }
+    }
+  };
+
+  // Handle successful signup
+  const handleSignUpSuccess = (userId: string) => {
+    // Success message is shown in modal
+    // User will need to verify email before logging in
+  };
+
+  // Handle logout
+  const handleLogout = async () => {
+    const result = await logout();
+    if (result.success) {
+      setCurrentUser(null);
+      setIsLoggedIn(false);
+      setUserWallet(null);
+      setCurrentPage('home');
+      showToastMessage('✅ Logged out successfully', 'success');
+    } else {
+      showToastMessage('❌ Error logging out', 'error');
+    }
+  };
+
+  // Marketplace Functions
+
+  // Open listing modal for an asset
+  const handleListAsset = (asset: any) => {
+    setAssetToList(asset);
+    setShowListingModal(true);
+  };
+
+  // List asset on marketplace
+  const handleConfirmListing = (listingData: any) => {
+    if (!assetToList) return;
+
+    // Update the asset with listing information
+    const updatedAsset = {
+      ...assetToList,
+      isListed: true,
+      salePrice: listingData.salePrice,
+      allowLease: listingData.allowLease,
+      leasePrice1Month: listingData.leasePrice1Month,
+      leasePrice6Month: listingData.leasePrice6Month,
+      leasePrice1Year: listingData.leasePrice1Year,
+      commercialUse: listingData.commercialUse,
+      attribution: listingData.attribution,
+      resale: listingData.resale || false,
+      listedDate: new Date().toISOString()
+    };
+
+    // Update protected files
+    const updatedFiles = protectedFiles.map(file =>
+      file.assetId === assetToList.assetId ? updatedAsset : file
+    );
+
+    setProtectedFiles(updatedFiles);
+    localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
+
+    // Update marketplace assets
+    const listedAssets = updatedFiles.filter(file => file.isListed);
+    setMarketplaceAssets(listedAssets);
+
+    setShowListingModal(false);
+    setAssetToList(null);
+
+    showToastMessage('✅ Asset listed on marketplace!', 'success');
+  };
+
+  // Unlist asset from marketplace
+  const handleUnlistAsset = (assetId: string) => {
+    const updatedFiles = protectedFiles.map(file =>
+      file.assetId === assetId ? { ...file, isListed: false, salePrice: 0 } : file
+    );
+
+    setProtectedFiles(updatedFiles);
+    localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
+
+    // Update marketplace assets
+    const listedAssets = updatedFiles.filter(file => file.isListed);
+    setMarketplaceAssets(listedAssets);
+
+    showToastMessage('✅ Asset removed from marketplace', 'success');
+  };
+
+  // View asset details
+  const handleViewAsset = (asset: any) => {
+    setSelectedAsset(asset);
+    setShowAssetDetail(true);
+  };
+
+  // Purchase asset
+  const handlePurchaseAsset = () => {
+    if (!selectedAsset || !currentUser) {
+      showToastMessage('⚠️ Please log in to purchase', 'warning');
+      return;
+    }
+
+    if (selectedAsset.creator === currentUser.name) {
+      showToastMessage('⚠️ You cannot buy your own asset', 'warning');
+      return;
+    }
+
+    const confirmed = confirm(
+      `Purchase ${selectedAsset.fileName} for $${selectedAsset.salePrice}?\n\nThis will transfer ownership to you.`
+    );
+
+    if (!confirmed) return;
+
+    // Simulate purchase (in production, this would call blockchain + Stripe)
+    const purchaseTx = '0x' + Array.from({ length: 64 }, () =>
       '0123456789abcdef'[Math.floor(Math.random() * 16)]
     ).join('');
 
-    // Generate 12-word seed phrase
-    const wordList = ['abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract', 'absurd', 'abuse', 'access', 'accident', 'account', 'accuse', 'achieve', 'acid', 'acoustic', 'acquire', 'across', 'act', 'action', 'actor', 'actress', 'actual', 'adapt', 'add', 'addict', 'address', 'adjust', 'admit', 'adult', 'advance', 'advice', 'aerobic', 'affair', 'afford', 'afraid', 'again', 'age', 'agent', 'agree', 'ahead', 'aim', 'air', 'airport', 'aisle', 'alarm', 'album', 'alcohol', 'alert', 'alien', 'all', 'alley', 'allow', 'almost', 'alone', 'alpha', 'already', 'also', 'alter', 'always', 'amateur', 'amazing', 'among', 'amount', 'amused', 'analyst', 'anchor', 'ancient', 'anger', 'angle', 'angry', 'animal', 'ankle', 'announce', 'annual', 'another', 'answer', 'antenna', 'antique', 'anxiety', 'any', 'apart', 'apology', 'appear', 'apple', 'approve', 'april', 'arch', 'arctic', 'area', 'arena', 'argue', 'arm', 'armed', 'armor', 'army', 'around', 'arrange', 'arrest', 'arrive', 'arrow', 'art', 'artefact', 'artist', 'artwork', 'ask', 'aspect', 'assault', 'asset', 'assist', 'assume', 'asthma', 'athlete', 'atom', 'attack', 'attend', 'attitude', 'attract', 'auction', 'audit', 'august', 'aunt', 'author', 'auto', 'autumn', 'average', 'avocado', 'avoid', 'awake', 'aware', 'away', 'awesome', 'awful', 'awkward', 'axis', 'baby', 'bachelor', 'bacon', 'badge', 'bag', 'balance', 'balcony', 'ball', 'bamboo', 'banana', 'banner', 'bar', 'barely', 'bargain', 'barrel', 'base', 'basic', 'basket', 'battle', 'beach', 'bean', 'beauty', 'because', 'become', 'beef', 'before', 'begin', 'behave', 'behind', 'believe', 'below', 'belt', 'bench', 'benefit', 'best', 'betray', 'better', 'between', 'beyond', 'bicycle', 'bid', 'bike', 'bind', 'biology', 'bird', 'birth', 'bitter', 'black', 'blade', 'blame', 'blanket', 'blast', 'bleak', 'bless', 'blind', 'blood', 'blossom', 'blouse', 'blue', 'blur', 'blush', 'board', 'boat', 'body', 'boil', 'bomb', 'bone', 'bonus', 'book', 'boost', 'border', 'boring', 'borrow', 'boss', 'bottom', 'bounce', 'box', 'boy', 'bracket', 'brain', 'brand', 'brass', 'brave', 'bread', 'breeze', 'brick', 'bridge', 'brief', 'bright', 'bring', 'brisk', 'broccoli', 'broken', 'bronze', 'broom', 'brother', 'brown', 'brush', 'bubble', 'buddy', 'budget', 'buffalo', 'build', 'bulb', 'bulk', 'bullet', 'bundle', 'bunker', 'burden', 'burger', 'burst', 'bus', 'business', 'busy', 'butter', 'buyer', 'buzz'];
+    // Update asset ownership
+    const updatedFiles = protectedFiles.map(file => {
+      if (file.assetId === selectedAsset.assetId) {
+        return {
+          ...file,
+          creator: currentUser.name,
+          creatorWallet: userWallet?.address,
+          isListed: false,
+          previousOwner: file.creator,
+          purchaseDate: new Date().toISOString(),
+          purchasePrice: file.salePrice,
+          purchaseTx: purchaseTx
+        };
+      }
+      return file;
+    });
 
-    const seedPhrase = [];
-    for (let i = 0; i < 12; i++) {
-      seedPhrase.push(wordList[Math.floor(Math.random() * wordList.length)]);
-    }
+    setProtectedFiles(updatedFiles);
+    localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
 
-    return {
-      address: address,
-      seedPhrase: seedPhrase.join(' ')
-    };
+    // Update marketplace
+    const listedAssets = updatedFiles.filter(file => file.isListed);
+    setMarketplaceAssets(listedAssets);
+
+    setShowAssetDetail(false);
+    setSelectedAsset(null);
+
+    showToastMessage('✅ Purchase successful! Asset is now yours.', 'success');
   };
 
-  // Handle actual login after method selection
-  const handleLoginComplete = (method: 'google' | 'email' | 'facebook') => {
-    setIsLoggedIn(true);
-
-    const methodNames = {
-      google: 'Google',
-      email: 'Email',
-      facebook: 'Facebook'
-    };
-
-    showToastMessage(`🔐 Logged in with ${methodNames[method]}! Welcome to BloomShield`, 'success');
-
-    // Initialize wallet on first login
-    if (typeof window !== 'undefined') {
-      const existingWallet = localStorage.getItem('userWallet');
-      const seedPhraseAck = localStorage.getItem('seedPhraseAcknowledged');
-
-      if (!existingWallet) {
-        const wallet = generateUserWallet();
-        localStorage.setItem('userWallet', JSON.stringify(wallet));
-        setUserWallet(wallet);
-
-        // Show seed phrase modal only if not acknowledged before
-        if (!seedPhraseAck) {
-          setTimeout(() => setShowSeedPhraseModal(true), 1000);
-        }
-      }
+  // Lease asset
+  const handleLeaseAsset = (duration: string, price: number) => {
+    if (!selectedAsset || !currentUser) {
+      showToastMessage('⚠️ Please log in to lease', 'warning');
+      return;
     }
+
+    if (selectedAsset.creator === currentUser.name) {
+      showToastMessage('⚠️ You cannot lease your own asset', 'warning');
+      return;
+    }
+
+    const confirmed = confirm(
+      `Lease ${selectedAsset.fileName} for ${duration} at $${price}?`
+    );
+
+    if (!confirmed) return;
+
+    // Simulate lease transaction
+    const leaseTx = '0x' + Array.from({ length: 64 }, () =>
+      '0123456789abcdef'[Math.floor(Math.random() * 16)]
+    ).join('');
+
+    // Calculate end date
+    const durationDays = duration === '1 Month' ? 30 : duration === '6 Months' ? 180 : 365;
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + durationDays);
+
+    // Store lease in localStorage
+    const leases = JSON.parse(localStorage.getItem('leases') || '[]');
+    leases.push({
+      assetId: selectedAsset.assetId,
+      assetName: selectedAsset.fileName,
+      lessee: currentUser.name,
+      lesseeWallet: userWallet?.address,
+      owner: selectedAsset.creator,
+      ownerWallet: selectedAsset.creatorWallet,
+      startDate: new Date().toISOString(),
+      endDate: endDate.toISOString(),
+      duration: duration,
+      price: price,
+      leaseTx: leaseTx,
+      active: true
+    });
+
+    localStorage.setItem('leases', JSON.stringify(leases));
+
+    setShowAssetDetail(false);
+    setSelectedAsset(null);
+
+    showToastMessage('✅ Lease created successfully!', 'success');
+  };
+
+  // Search marketplace
+  const handleMarketplaceSearch = () => {
+    if (!marketplaceSearchQuery.trim()) {
+      // Reload all listings if search is empty
+      const listedAssets = protectedFiles.filter(file => file.isListed);
+      setMarketplaceAssets(listedAssets);
+      return;
+    }
+
+    const query = marketplaceSearchQuery.toLowerCase();
+    const results = protectedFiles.filter(file => {
+      if (!file.isListed) return false;
+
+      return (
+        file.fileName?.toLowerCase().includes(query) ||
+        file.creator?.toLowerCase().includes(query) ||
+        file.assetId?.toLowerCase().includes(query) ||
+        file.fileType?.toLowerCase().includes(query)
+      );
+    });
+
+    setMarketplaceAssets(results);
+
+    if (results.length === 0) {
+      showToastMessage(`No results found for "${marketplaceSearchQuery}"`, 'warning');
+    }
+  };
+
+  // Apply marketplace filters
+  const handleApplyFilters = () => {
+    let filtered = protectedFiles.filter(file => file.isListed);
+
+    // Filter by type
+    if (marketplaceFilters.type !== 'all') {
+      filtered = filtered.filter(file =>
+        file.fileType?.toLowerCase().includes(marketplaceFilters.type)
+      );
+    }
+
+    // Filter by license
+    if (marketplaceFilters.license === 'sale') {
+      filtered = filtered.filter(file => file.salePrice > 0);
+    } else if (marketplaceFilters.license === 'lease') {
+      filtered = filtered.filter(file => file.allowLease);
+    }
+
+    // Filter by price
+    if (marketplaceFilters.price !== 'all') {
+      const [min, max] = marketplaceFilters.price.includes('+')
+        ? [1000, Infinity]
+        : marketplaceFilters.price.split('-').map(Number);
+
+      filtered = filtered.filter(file => {
+        const price = file.salePrice || 0;
+        return price >= min && price <= (max || Infinity);
+      });
+    }
+
+    // Sort
+    if (marketplaceFilters.sort === 'newest') {
+      filtered.sort((a, b) => new Date(b.protectedDate || 0).getTime() - new Date(a.protectedDate || 0).getTime());
+    } else if (marketplaceFilters.sort === 'price-low') {
+      filtered.sort((a, b) => (a.salePrice || 0) - (b.salePrice || 0));
+    } else if (marketplaceFilters.sort === 'price-high') {
+      filtered.sort((a, b) => (b.salePrice || 0) - (a.salePrice || 0));
+    }
+
+    setMarketplaceAssets(filtered);
+    showToastMessage(`Found ${filtered.length} assets`, 'success');
   };
 
   // Handle navigation
@@ -847,27 +1138,58 @@ export default function Home() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {protectedFiles.map((file, index) => (
-                        <div
-                          key={index}
-                          className="file-card cursor-pointer"
-                          onClick={() => {
-                            setCertificateData(file);
-                            setShowCertificate(true);
-                          }}
-                        >
-                          <div className="w-full h-48 flex items-center justify-center text-6xl bg-[#E8E8E8]">
-                            {getFileIcon(file.fileType)}
+                        <div key={index} className="file-card">
+                          <div
+                            className="cursor-pointer"
+                            onClick={() => {
+                              setCertificateData(file);
+                              setShowCertificate(true);
+                            }}
+                          >
+                            <div className="w-full h-48 flex items-center justify-center text-6xl bg-[#E8E8E8]">
+                              {getFileIcon(file.fileType)}
+                            </div>
+                            <div className="p-5">
+                              <div className="font-semibold text-gray-800 mb-2 truncate" title={file.fileName}>
+                                {file.fileName}
+                              </div>
+                              <div className="text-gray-500 text-sm mb-3">
+                                Protected {getRelativeDate(file.protectedDate)}
+                              </div>
+                              <div className="font-mono bg-gray-100 p-3 rounded-lg text-xs text-gray-600 truncate" title={file.assetId}>
+                                {file.assetId}
+                              </div>
+                            </div>
                           </div>
-                          <div className="p-5">
-                            <div className="font-semibold text-gray-800 mb-2 truncate" title={file.fileName}>
-                              {file.fileName}
-                            </div>
-                            <div className="text-gray-500 text-sm mb-3">
-                              Protected {getRelativeDate(file.protectedDate)}
-                            </div>
-                            <div className="font-mono bg-gray-100 p-3 rounded-lg text-xs text-gray-600 truncate" title={file.assetId}>
-                              {file.assetId}
-                            </div>
+
+                          {/* Action Buttons */}
+                          <div className="px-5 pb-5 space-y-2">
+                            {file.isListed ? (
+                              <div className="space-y-2">
+                                <div className="bg-green-50 border border-green-200 text-green-700 text-center py-2 rounded-lg text-sm font-semibold">
+                                  ✓ Listed on Marketplace
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnlistAsset(file.assetId);
+                                  }}
+                                  className="w-full bg-gray-200 text-gray-700 py-2 rounded-lg text-sm font-semibold hover:bg-gray-300 transition-all"
+                                >
+                                  Remove from Marketplace
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleListAsset(file);
+                                }}
+                                className="w-full bg-[#FF8C42] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#ff7a2e] transition-all"
+                              >
+                                🛒 List on Marketplace
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1228,6 +1550,152 @@ export default function Home() {
                   <div className="text-sm text-gray-500">Full ownership transfer</div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* MARKETPLACE PAGE */}
+        {currentPage === 'marketplace' && (
+          <div className="p-4 md:p-8 max-w-7xl mx-auto">
+            {/* Marketplace Header */}
+            <div className="mb-8">
+              <h1 className="text-4xl font-bold text-gray-800 mb-4">Marketplace</h1>
+              <p className="text-gray-600">Buy or lease creative assets protected on blockchain</p>
+            </div>
+
+            {/* Search Bar */}
+            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+              <div className="flex gap-4">
+                <input
+                  type="text"
+                  value={marketplaceSearchQuery}
+                  onChange={(e) => setMarketplaceSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleMarketplaceSearch()}
+                  placeholder="Search assets by name, creator, or Asset ID..."
+                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                />
+                <button
+                  onClick={handleMarketplaceSearch}
+                  className="bg-[#FF8C42] text-white px-8 py-3 rounded-lg font-semibold hover:bg-[#ff7a2e] transition-all"
+                >
+                  🔍 Search
+                </button>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Asset Type</label>
+                  <select
+                    value={marketplaceFilters.type}
+                    onChange={(e) => setMarketplaceFilters({ ...marketplaceFilters, type: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                  >
+                    <option value="all">All Types</option>
+                    <option value="image">Images</option>
+                    <option value="video">Videos</option>
+                    <option value="audio">Audio</option>
+                    <option value="pdf">Documents</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">License Type</label>
+                  <select
+                    value={marketplaceFilters.license}
+                    onChange={(e) => setMarketplaceFilters({ ...marketplaceFilters, license: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                  >
+                    <option value="all">All</option>
+                    <option value="sale">For Sale</option>
+                    <option value="lease">For Lease</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Price Range</label>
+                  <select
+                    value={marketplaceFilters.price}
+                    onChange={(e) => setMarketplaceFilters({ ...marketplaceFilters, price: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                  >
+                    <option value="all">Any Price</option>
+                    <option value="0-50">$0 - $50</option>
+                    <option value="50-200">$50 - $200</option>
+                    <option value="200-1000">$200 - $1000</option>
+                    <option value="1000+">$1000+</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Sort By</label>
+                  <select
+                    value={marketplaceFilters.sort}
+                    onChange={(e) => setMarketplaceFilters({ ...marketplaceFilters, sort: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="price-low">Price: Low to High</option>
+                    <option value="price-high">Price: High to Low</option>
+                  </select>
+                </div>
+              </div>
+
+              <button
+                onClick={handleApplyFilters}
+                className="mt-4 bg-gray-800 text-white px-6 py-2 rounded-lg font-semibold hover:bg-gray-700 transition-all"
+              >
+                Apply Filters
+              </button>
+            </div>
+
+            {/* Asset Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {marketplaceAssets.length === 0 ? (
+                <div className="col-span-full bg-white rounded-xl shadow-md p-16 text-center">
+                  <div className="text-6xl mb-4">🛒</div>
+                  <p className="text-gray-500 text-lg mb-2">No assets listed yet</p>
+                  <p className="text-gray-400 text-sm">Check back later for new listings!</p>
+                </div>
+              ) : (
+                marketplaceAssets.map((asset, index) => (
+                  <div
+                    key={index}
+                    onClick={() => handleViewAsset(asset)}
+                    className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-xl transition-all transform hover:-translate-y-1"
+                  >
+                    {/* Asset Thumbnail */}
+                    <div className="h-48 bg-gradient-to-br from-orange-100 to-pink-100 flex items-center justify-center">
+                      <div className="text-6xl">{getFileIcon(asset.fileType)}</div>
+                    </div>
+
+                    {/* Asset Info */}
+                    <div className="p-4">
+                      <h3 className="font-bold text-gray-800 mb-2 truncate">{asset.fileName}</h3>
+                      <p className="text-sm text-gray-500 mb-3">by {asset.creator}</p>
+
+                      <div className="flex items-center justify-between mb-3">
+                        {asset.salePrice > 0 && (
+                          <div className="text-2xl font-bold text-[#FF8C42]">${asset.salePrice}</div>
+                        )}
+                        {asset.allowLease && (
+                          <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full font-semibold">
+                            Lease Available
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span>{asset.fileType}</span>
+                        <span>{getRelativeDate(asset.protectedDate)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
@@ -2178,11 +2646,12 @@ export default function Home() {
         onComplete={handleProcessingComplete}
       />
 
-      {/* Login Modal */}
-      <LoginModal
+      {/* Auth Modal (Login/Signup/Reset) */}
+      <AuthModal
         show={showLoginModal}
         onClose={() => setShowLoginModal(false)}
-        onLogin={handleLoginComplete}
+        onLoginSuccess={handleLoginSuccess}
+        onSignUpSuccess={handleSignUpSuccess}
       />
 
       {/* Change Password Modal */}
@@ -2308,6 +2777,7 @@ export default function Home() {
               onClick={() => {
                 localStorage.setItem('seedPhraseAcknowledged', 'true');
                 setShowSeedPhraseModal(false);
+                setCurrentPage('dashboard');
                 showToastMessage('✅ Wallet created! Your ownership is now permanent.', 'success');
               }}
               className="w-full bg-gray-300 text-white py-4 rounded-lg font-bold text-lg cursor-not-allowed"
@@ -2326,6 +2796,307 @@ export default function Home() {
           data={certificateData}
           onNavigateToDashboard={handleNavigateToDashboard}
         />
+      )}
+
+      {/* Listing Modal */}
+      {showListingModal && assetToList && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[3000] p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl relative">
+            {/* Close button */}
+            <button
+              onClick={() => {
+                setShowListingModal(false);
+                setAssetToList(null);
+              }}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl"
+            >
+              ×
+            </button>
+
+            <h2 className="text-3xl font-bold text-gray-800 mb-2">List {assetToList.fileName} on Marketplace</h2>
+            <p className="text-gray-600 mb-6">Set your pricing and license terms</p>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const listingType = formData.get('listingType') as string;
+
+                handleConfirmListing({
+                  salePrice: parseFloat(formData.get('salePrice') as string) || 0,
+                  allowLease: listingType === 'lease' || listingType === 'both',
+                  leasePrice1Month: parseFloat(formData.get('lease1Month') as string) || 0,
+                  leasePrice6Month: parseFloat(formData.get('lease6Month') as string) || 0,
+                  leasePrice1Year: parseFloat(formData.get('lease1Year') as string) || 0,
+                  commercialUse: formData.get('commercialUse') === 'on',
+                  attribution: formData.get('attribution') === 'on'
+                });
+              }}
+            >
+              {/* Listing Type */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Listing Type:</label>
+                <div className="space-y-2">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="listingType"
+                      value="sale"
+                      defaultChecked
+                      className="w-4 h-4 mr-2 accent-[#FF8C42]"
+                      onChange={(e) => {
+                        const saleSection = document.getElementById('saleSection');
+                        const leaseSection = document.getElementById('leaseSection');
+                        if (saleSection && leaseSection) {
+                          saleSection.style.display = 'block';
+                          leaseSection.style.display = 'none';
+                        }
+                      }}
+                    />
+                    <span>Sale Only</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="listingType"
+                      value="lease"
+                      className="w-4 h-4 mr-2 accent-[#FF8C42]"
+                      onChange={(e) => {
+                        const saleSection = document.getElementById('saleSection');
+                        const leaseSection = document.getElementById('leaseSection');
+                        if (saleSection && leaseSection) {
+                          saleSection.style.display = 'none';
+                          leaseSection.style.display = 'block';
+                        }
+                      }}
+                    />
+                    <span>Lease Only</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="listingType"
+                      value="both"
+                      className="w-4 h-4 mr-2 accent-[#FF8C42]"
+                      onChange={(e) => {
+                        const saleSection = document.getElementById('saleSection');
+                        const leaseSection = document.getElementById('leaseSection');
+                        if (saleSection && leaseSection) {
+                          saleSection.style.display = 'block';
+                          leaseSection.style.display = 'block';
+                        }
+                      }}
+                    />
+                    <span>Both (Sale + Lease)</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Sale Price */}
+              <div id="saleSection" className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Sale Price (USD):</label>
+                <input
+                  type="number"
+                  name="salePrice"
+                  min="1"
+                  step="0.01"
+                  placeholder="500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                  required
+                />
+              </div>
+
+              {/* Lease Pricing */}
+              <div id="leaseSection" className="mb-6" style={{ display: 'none' }}>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Lease Pricing:</label>
+                <div className="space-y-3">
+                  <input
+                    type="number"
+                    name="lease1Month"
+                    min="1"
+                    step="0.01"
+                    placeholder="1 Month Price ($50)"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                  />
+                  <input
+                    type="number"
+                    name="lease6Month"
+                    min="1"
+                    step="0.01"
+                    placeholder="6 Months Price ($250)"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                  />
+                  <input
+                    type="number"
+                    name="lease1Year"
+                    min="1"
+                    step="0.01"
+                    placeholder="1 Year Price ($400)"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                  />
+                </div>
+              </div>
+
+              {/* License Terms */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">License Terms:</label>
+                <div className="space-y-2">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="commercialUse"
+                      defaultChecked
+                      className="w-4 h-4 mr-2 accent-[#FF8C42]"
+                    />
+                    <span>Commercial use allowed</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="attribution"
+                      defaultChecked
+                      className="w-4 h-4 mr-2 accent-[#FF8C42]"
+                    />
+                    <span>Attribution required</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                className="w-full bg-[#FF8C42] text-white py-4 rounded-lg font-bold text-lg hover:bg-[#ff7a2e] transition-all"
+              >
+                Publish to Marketplace
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Asset Detail Modal */}
+      {showAssetDetail && selectedAsset && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[3000] p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl p-8 max-w-4xl w-full shadow-2xl relative my-8">
+            {/* Close button */}
+            <button
+              onClick={() => {
+                setShowAssetDetail(false);
+                setSelectedAsset(null);
+              }}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl"
+            >
+              ×
+            </button>
+
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Left: Preview */}
+              <div>
+                <div className="bg-gradient-to-br from-orange-100 to-pink-100 rounded-xl h-64 flex items-center justify-center mb-4">
+                  <div className="text-8xl">{getFileIcon(selectedAsset.fileType)}</div>
+                </div>
+
+                <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-lg text-center">
+                  <p className="font-semibold mb-1">✓ Verified on Polygon Blockchain</p>
+                  <button
+                    onClick={() => window.open(`https://polygonscan.com/tx/${selectedAsset.blockchainTx}`, '_blank')}
+                    className="text-sm underline hover:text-green-900"
+                  >
+                    View Transaction
+                  </button>
+                </div>
+              </div>
+
+              {/* Right: Info & Purchase */}
+              <div>
+                <h2 className="text-3xl font-bold text-gray-800 mb-2">{selectedAsset.fileName}</h2>
+                <p className="text-gray-600 mb-4">Protected creative asset</p>
+
+                <div className="bg-gray-50 p-4 rounded-lg mb-6 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="font-semibold">Creator:</span>
+                    <span>{selectedAsset.creator}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold">Protected:</span>
+                    <span>{getRelativeDate(selectedAsset.protectedDate)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold">Asset ID:</span>
+                    <span className="font-mono text-xs">{selectedAsset.assetId}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold">File Type:</span>
+                    <span>{selectedAsset.fileType}</span>
+                  </div>
+                </div>
+
+                {/* Purchase Options */}
+                {selectedAsset.salePrice > 0 && (
+                  <div className="bg-[#FFF5F0] border-2 border-[#FF8C42] p-6 rounded-xl mb-4">
+                    <h3 className="font-bold text-xl text-gray-800 mb-2">Buy Outright</h3>
+                    <div className="text-4xl font-bold text-[#FF8C42] mb-3">${selectedAsset.salePrice}</div>
+                    <p className="text-sm text-gray-600 mb-4">Full ownership transfer. You can use commercially and resell.</p>
+                    <button
+                      onClick={handlePurchaseAsset}
+                      className="w-full bg-[#FF8C42] text-white py-3 rounded-lg font-bold hover:bg-[#ff7a2e] transition-all"
+                    >
+                      Buy Now
+                    </button>
+                  </div>
+                )}
+
+                {/* Lease Options */}
+                {selectedAsset.allowLease && (
+                  <div className="bg-purple-50 border-2 border-purple-300 p-6 rounded-xl">
+                    <h3 className="font-bold text-xl text-gray-800 mb-3">Lease</h3>
+                    <p className="text-sm text-gray-600 mb-4">Time-limited usage rights</p>
+
+                    <div className="space-y-2">
+                      {selectedAsset.leasePrice1Month > 0 && (
+                        <button
+                          onClick={() => handleLeaseAsset('1 Month', selectedAsset.leasePrice1Month)}
+                          className="w-full bg-white border-2 border-purple-300 text-purple-700 py-3 rounded-lg font-semibold hover:bg-purple-100 transition-all flex justify-between items-center px-4"
+                        >
+                          <span>1 Month</span>
+                          <span className="font-bold">${selectedAsset.leasePrice1Month}</span>
+                        </button>
+                      )}
+                      {selectedAsset.leasePrice6Month > 0 && (
+                        <button
+                          onClick={() => handleLeaseAsset('6 Months', selectedAsset.leasePrice6Month)}
+                          className="w-full bg-white border-2 border-purple-300 text-purple-700 py-3 rounded-lg font-semibold hover:bg-purple-100 transition-all flex justify-between items-center px-4"
+                        >
+                          <span>6 Months</span>
+                          <span className="font-bold">${selectedAsset.leasePrice6Month}</span>
+                        </button>
+                      )}
+                      {selectedAsset.leasePrice1Year > 0 && (
+                        <button
+                          onClick={() => handleLeaseAsset('1 Year', selectedAsset.leasePrice1Year)}
+                          className="w-full bg-white border-2 border-purple-300 text-purple-700 py-3 rounded-lg font-semibold hover:bg-purple-100 transition-all flex justify-between items-center px-4"
+                        >
+                          <span>1 Year</span>
+                          <span className="font-bold">${selectedAsset.leasePrice1Year}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* License Terms */}
+                <div className="mt-6 bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-800 mb-2">License Terms</h4>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    <li>{selectedAsset.commercialUse ? '✓' : '✗'} Commercial use allowed</li>
+                    <li>{selectedAsset.attribution ? '✓' : '✗'} Attribution required</li>
+                    <li>✓ Blockchain verified ownership</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
