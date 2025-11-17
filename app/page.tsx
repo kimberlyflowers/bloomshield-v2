@@ -52,6 +52,30 @@ export default function Home() {
   // Wallet card color state
   const [cardColor, setCardColor] = useState('blush');
 
+  // Profile page state
+  const [profileEditMode, setProfileEditMode] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [profileData, setProfileData] = useState({
+    fullName: 'Sarah Johnson',
+    email: 'sarah@example.com',
+    phone: '',
+    bio: 'Freelance photographer and digital artist based in San Francisco.',
+    businessEnabled: false,
+    businessName: '',
+    companyWebsite: '',
+    industry: '',
+    taxId: '',
+    portfolioWebsite: '',
+    instagram: '@sarahjohnson',
+    twitter: '',
+    linkedin: '',
+    other: '',
+    accountType: 'free', // or 'pro'
+    memberSince: 'March 2024',
+    profilePhoto: '👤'
+  });
+  const profilePhotoInputRef = useRef<HTMLInputElement>(null);
+
   // PRESERVED: Supabase client initialization
   const getSupabaseClient = () => {
     if (typeof window === 'undefined') return null;
@@ -365,6 +389,62 @@ export default function Home() {
       return;
     }
     alert(`📄 Create Listing for ${certificateData.fileName}\n\nThis feature would allow you to:\n• Set licensing terms and pricing\n• Choose license types (personal/commercial/exclusive)\n• Publish to the BloomShield marketplace\n\nComing soon in production!`);
+  };
+
+  // Profile page handlers
+  const handleProfileEdit = () => {
+    if (profileEditMode) {
+      // Save changes
+      showToastMessage('✅ Profile updated successfully!', 'success');
+      setProfileEditMode(false);
+    } else {
+      // Enter edit mode
+      setProfileEditMode(true);
+    }
+  };
+
+  const handleProfileCancel = () => {
+    // Revert changes (in a real app, you'd restore from saved state)
+    setProfileEditMode(false);
+    showToastMessage('Changes cancelled', 'warning');
+  };
+
+  const handleProfilePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        setProfileData(prev => ({ ...prev, profilePhoto: result }));
+        showToastMessage('✅ Profile photo updated', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleChangePassword = () => {
+    setShowChangePasswordModal(true);
+  };
+
+  const handlePasswordModalClose = () => {
+    setShowChangePasswordModal(false);
+  };
+
+  const handlePasswordChange = () => {
+    // In real app: validate and submit password change
+    showToastMessage('✅ Password changed successfully!', 'success');
+    setShowChangePasswordModal(false);
+  };
+
+  const handleAccountAction = (action: string) => {
+    const messages: { [key: string]: string } = {
+      '2fa': '🔐 Two-Factor Authentication\n\nThis feature will allow you to add an extra layer of security to your account.\n\nComing soon!',
+      'notifications': '📧 Email Notifications\n\nManage your email notification preferences here.\n\nComing soon!',
+      'privacy': '🔒 Privacy Settings\n\nControl who can see your work and contact you.\n\nComing soon!',
+      'download': '📥 Download My Data\n\nRequest a copy of all your data stored with BloomShield.\n\nComing soon!',
+      'delete': '⚠️ Delete Account\n\nPermanently delete your account and all associated data.\n\nPlease contact support@bloomshield.com if you wish to delete your account.'
+    };
+    alert(messages[action] || 'Feature coming soon!');
   };
 
   return (
@@ -964,10 +1044,336 @@ export default function Home() {
           </div>
         )}
 
-        {/* OTHER PAGES - Placeholder */}
-        {['profile', 'settings'].includes(currentPage) && (
+        {/* PROFILE PAGE */}
+        {currentPage === 'profile' && (
+          <div className="p-4 md:p-8 max-w-4xl mx-auto">
+            {/* Profile Header */}
+            <div className="bg-white rounded-xl shadow-md p-8 mb-6 text-center">
+              <input
+                type="file"
+                ref={profilePhotoInputRef}
+                onChange={handleProfilePhotoChange}
+                accept="image/*"
+                className="hidden"
+              />
+              <div
+                onClick={() => profilePhotoInputRef.current?.click()}
+                className="w-32 h-32 mx-auto mb-4 rounded-full bg-gradient-to-br from-pink-200 to-orange-300 flex items-center justify-center text-6xl cursor-pointer hover:opacity-80 transition-all overflow-hidden"
+                style={{
+                  backgroundImage: profileData.profilePhoto.startsWith('data:') ? `url(${profileData.profilePhoto})` : 'none',
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center'
+                }}
+              >
+                {!profileData.profilePhoto.startsWith('data:') && profileData.profilePhoto}
+              </div>
+              <h1 className="text-3xl font-bold text-gray-800 mb-2">{profileData.fullName}</h1>
+              <div className="inline-block bg-orange-100 text-[#FF8C42] px-4 py-1 rounded-full font-semibold text-sm mb-2">
+                {profileData.accountType === 'pro' ? '🌟 Pro Account' : '🆓 Free Account'}
+              </div>
+              <p className="text-gray-500 text-sm">Member since: {profileData.memberSince}</p>
+            </div>
+
+            {/* Personal Information */}
+            <div className="bg-white rounded-xl shadow-md p-8 mb-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Personal Information</h2>
+                <div className="flex gap-2">
+                  {profileEditMode && (
+                    <button
+                      onClick={handleProfileCancel}
+                      className="px-4 py-2 border-2 border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-all font-semibold"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    onClick={handleProfileEdit}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                      profileEditMode
+                        ? 'bg-[#FF8C42] text-white hover:bg-[#ff7a2e]'
+                        : 'border-2 border-[#FF8C42] text-[#FF8C42] hover:bg-orange-50'
+                    }`}
+                  >
+                    {profileEditMode ? 'Save' : 'Edit'}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={profileData.fullName}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, fullName: e.target.value }))}
+                    disabled={!profileEditMode}
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={profileData.email}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
+                    disabled={!profileEditMode}
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Phone (optional)</label>
+                  <input
+                    type="tel"
+                    value={profileData.phone}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
+                    disabled={!profileEditMode}
+                    placeholder="+1 (555) 000-0000"
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Bio</label>
+                  <textarea
+                    value={profileData.bio}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, bio: e.target.value }))}
+                    disabled={!profileEditMode}
+                    rows={3}
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600 resize-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Business Information */}
+            <div className="bg-white rounded-xl shadow-md p-8 mb-6">
+              <div className="mb-6">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={profileData.businessEnabled}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, businessEnabled: e.target.checked }))}
+                    disabled={!profileEditMode}
+                    className="w-5 h-5 text-[#FF8C42] rounded focus:ring-[#FF8C42] disabled:opacity-50"
+                  />
+                  <span className="ml-2 text-lg font-semibold text-gray-800">I'm using BloomShield for business</span>
+                </label>
+              </div>
+              {profileData.businessEnabled && (
+                <div className="space-y-4 border-t pt-6">
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Business Name</label>
+                    <input
+                      type="text"
+                      value={profileData.businessName}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, businessName: e.target.value }))}
+                      disabled={!profileEditMode}
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Company Website</label>
+                    <input
+                      type="url"
+                      value={profileData.companyWebsite}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, companyWebsite: e.target.value }))}
+                      disabled={!profileEditMode}
+                      placeholder="https://example.com"
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Industry</label>
+                    <select
+                      value={profileData.industry}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, industry: e.target.value }))}
+                      disabled={!profileEditMode}
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                    >
+                      <option value="">Select industry...</option>
+                      <option value="photography">Photography</option>
+                      <option value="design">Design</option>
+                      <option value="music">Music</option>
+                      <option value="video">Video</option>
+                      <option value="writing">Writing</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Tax ID/EIN (optional)</label>
+                    <input
+                      type="text"
+                      value={profileData.taxId}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, taxId: e.target.value }))}
+                      disabled={!profileEditMode}
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Social Links */}
+            <div className="bg-white rounded-xl shadow-md p-8 mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">Social Links</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Portfolio/Website</label>
+                  <input
+                    type="url"
+                    value={profileData.portfolioWebsite}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, portfolioWebsite: e.target.value }))}
+                    disabled={!profileEditMode}
+                    placeholder="https://yourportfolio.com"
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Instagram</label>
+                  <input
+                    type="text"
+                    value={profileData.instagram}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, instagram: e.target.value }))}
+                    disabled={!profileEditMode}
+                    placeholder="@username"
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Twitter/X</label>
+                  <input
+                    type="text"
+                    value={profileData.twitter}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, twitter: e.target.value }))}
+                    disabled={!profileEditMode}
+                    placeholder="@username"
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">LinkedIn</label>
+                  <input
+                    type="text"
+                    value={profileData.linkedin}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, linkedin: e.target.value }))}
+                    disabled={!profileEditMode}
+                    placeholder="linkedin.com/in/username"
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Other</label>
+                  <input
+                    type="text"
+                    value={profileData.other}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, other: e.target.value }))}
+                    disabled={!profileEditMode}
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Account Settings */}
+            <div className="bg-white rounded-xl shadow-md p-8 mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">Account Settings</h2>
+              <div className="space-y-2">
+                <button
+                  onClick={handleChangePassword}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-all flex items-center justify-between group"
+                >
+                  <span className="text-gray-700 group-hover:text-[#FF8C42]">→ Change Password</span>
+                </button>
+                <button
+                  onClick={() => handleAccountAction('2fa')}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-all flex items-center justify-between group"
+                >
+                  <span className="text-gray-700 group-hover:text-[#FF8C42]">→ Two-Factor Authentication</span>
+                  <span className="text-xs bg-gray-100 px-2 py-1 rounded">Coming Soon</span>
+                </button>
+                <button
+                  onClick={() => handleAccountAction('notifications')}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-all flex items-center justify-between group"
+                >
+                  <span className="text-gray-700 group-hover:text-[#FF8C42]">→ Email Notifications</span>
+                </button>
+                <button
+                  onClick={() => handleAccountAction('privacy')}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-all flex items-center justify-between group"
+                >
+                  <span className="text-gray-700 group-hover:text-[#FF8C42]">→ Privacy Settings</span>
+                </button>
+                <button
+                  onClick={() => handleAccountAction('download')}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-all flex items-center justify-between group"
+                >
+                  <span className="text-gray-700 group-hover:text-[#FF8C42]">→ Download My Data</span>
+                </button>
+                <button
+                  onClick={() => handleAccountAction('delete')}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-all flex items-center justify-between group"
+                >
+                  <span className="text-red-600 group-hover:text-red-700">→ Delete Account</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Subscription/Account Tier */}
+            <div className="bg-white rounded-xl shadow-md p-8 mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">Subscription</h2>
+              {profileData.accountType === 'free' ? (
+                <>
+                  <div className="mb-6">
+                    <div className="text-lg font-semibold text-gray-800 mb-4">Current Plan: Free</div>
+                    <div className="space-y-2">
+                      <div className="flex items-center text-gray-600">
+                        <span className="text-green-500 mr-2">✓</span> Unlimited file protection
+                      </div>
+                      <div className="flex items-center text-gray-600">
+                        <span className="text-green-500 mr-2">✓</span> Certificate generation
+                      </div>
+                      <div className="flex items-center text-gray-400">
+                        <span className="text-gray-300 mr-2">✗</span> Advanced monitoring
+                      </div>
+                      <div className="flex items-center text-gray-400">
+                        <span className="text-gray-300 mr-2">✗</span> Case management
+                      </div>
+                      <div className="flex items-center text-gray-400">
+                        <span className="text-gray-300 mr-2">✗</span> Priority support
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleUpgradeToPro}
+                    className="w-full bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-bold py-3 px-6 rounded-lg transition-all hover:shadow-lg"
+                  >
+                    Upgrade to Pro →
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="mb-6">
+                    <div className="text-lg font-semibold text-gray-800 mb-2">Current Plan: Pro</div>
+                    <div className="text-gray-600 mb-1">Billing: $29/month</div>
+                    <div className="text-gray-600">Next billing date: Dec 15, 2025</div>
+                  </div>
+                  <div className="flex gap-4">
+                    <button className="flex-1 bg-white border-2 border-[#FF8C42] text-[#FF8C42] hover:bg-orange-50 font-semibold py-3 px-6 rounded-lg transition-all">
+                      Manage Subscription
+                    </button>
+                    <button className="flex-1 bg-white border-2 border-gray-300 text-gray-600 hover:bg-gray-50 font-semibold py-3 px-6 rounded-lg transition-all">
+                      View Invoices
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* SETTINGS PAGE - Placeholder */}
+        {currentPage === 'settings' && (
           <div className="p-4 md:p-8 max-w-7xl mx-auto">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-8 capitalize">{currentPage}</h1>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-8">Settings</h1>
             <div className="bg-white rounded-xl shadow-md p-12 md:p-16 text-center">
               <div className="text-6xl mb-4">🚧</div>
               <h3 className="text-xl font-bold text-gray-800 mb-2">Coming Soon</h3>
@@ -990,6 +1396,61 @@ export default function Home() {
         onClose={() => setShowLoginModal(false)}
         onLogin={handleLoginComplete}
       />
+
+      {/* Change Password Modal */}
+      {showChangePasswordModal && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[2000] animate-fadeIn"
+          onClick={handlePasswordModalClose}
+        >
+          <div
+            className="bg-white w-[90%] max-w-md rounded-2xl p-8 shadow-2xl animate-slideUp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Change Password</h2>
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">Current Password</label>
+                <input
+                  type="password"
+                  placeholder="Enter current password"
+                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">New Password</label>
+                <input
+                  type="password"
+                  placeholder="Enter new password"
+                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">Confirm New Password</label>
+                <input
+                  type="password"
+                  placeholder="Confirm new password"
+                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handlePasswordModalClose}
+                className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-all font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePasswordChange}
+                className="flex-1 px-4 py-2 bg-[#FF8C42] text-white rounded-lg hover:bg-[#ff7a2e] transition-all font-semibold"
+              >
+                Change Password
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Certificate Modal */}
       {certificateData && (
