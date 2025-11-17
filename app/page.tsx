@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import TopBar from '@/components/TopBar';
 import Toast from '@/components/Toast';
@@ -75,6 +75,24 @@ export default function Home() {
     profilePhoto: '👤'
   });
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
+
+  // Protected files state (for My Files dashboard section)
+  const [protectedFiles, setProtectedFiles] = useState<any[]>([]);
+
+  // Load protected files from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedFiles = localStorage.getItem('protectedFiles');
+      if (savedFiles) {
+        try {
+          const files = JSON.parse(savedFiles);
+          setProtectedFiles(files);
+        } catch (error) {
+          console.error('Error loading protected files:', error);
+        }
+      }
+    }
+  }, []);
 
   // PRESERVED: Supabase client initialization
   const getSupabaseClient = () => {
@@ -250,6 +268,19 @@ export default function Home() {
       };
       setCertificateData(certData);
 
+      // Save to localStorage for My Files section
+      if (typeof window !== 'undefined') {
+        try {
+          const savedFiles = localStorage.getItem('protectedFiles');
+          const filesArray = savedFiles ? JSON.parse(savedFiles) : [];
+          filesArray.unshift(certData); // Add new file to the beginning
+          localStorage.setItem('protectedFiles', JSON.stringify(filesArray));
+          setProtectedFiles(filesArray); // Update state
+        } catch (error) {
+          console.error('Error saving to localStorage:', error);
+        }
+      }
+
       const successMessage = blockchainTransactionHash.startsWith('0xSIM')
         ? '✅ File protected successfully! ⚠️ Using simulated blockchain.'
         : '✅ File protected and stored successfully! ⛓️ Blockchain timestamp created!';
@@ -278,6 +309,47 @@ export default function Home() {
     setToastMessage(message);
     setToastType(type);
     setShowToast(true);
+  };
+
+  // Helper function to get file icon based on file type
+  const getFileIcon = (fileType: string) => {
+    if (!fileType) return '📄';
+    const type = fileType.toLowerCase();
+    if (type.includes('image') || type.includes('png') || type.includes('jpg') || type.includes('jpeg')) return '🖼️';
+    if (type.includes('video') || type.includes('mp4') || type.includes('mov')) return '🎬';
+    if (type.includes('audio') || type.includes('mp3') || type.includes('wav')) return '🎵';
+    if (type.includes('pdf')) return '📕';
+    if (type.includes('illustrator') || type.includes('photoshop')) return '🎨';
+    if (type.includes('word') || type.includes('doc')) return '📝';
+    if (type.includes('excel') || type.includes('sheet')) return '📊';
+    if (type.includes('zip') || type.includes('rar')) return '📦';
+    return '📄';
+  };
+
+  // Helper function to get relative date (e.g., "Protected 2 days ago")
+  const getRelativeDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+      if (diffMinutes < 1) return 'just now';
+      if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`;
+      if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+      if (diffDays === 1) return 'yesterday';
+      if (diffDays < 30) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+      if (diffDays < 365) {
+        const months = Math.floor(diffDays / 30);
+        return `${months} month${months > 1 ? 's' : ''} ago`;
+      }
+      const years = Math.floor(diffDays / 365);
+      return `${years} year${years > 1 ? 's' : ''} ago`;
+    } catch (error) {
+      return dateString;
+    }
   };
 
   // Handle file selection - AUTO-START processing
@@ -630,7 +702,7 @@ export default function Home() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-[#FF8C42]">
                       <div className="text-gray-500 text-sm mb-2">Total Files Protected</div>
-                      <div className="text-4xl font-bold text-gray-800">{recordId || 24}</div>
+                      <div className="text-4xl font-bold text-gray-800">{protectedFiles.length}</div>
                     </div>
                     <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-[#FF8C42]">
                       <div className="text-gray-500 text-sm mb-2">Active Monitoring</div>
@@ -648,20 +720,39 @@ export default function Home() {
 
                   {/* Recent Files */}
                   <h2 className="text-2xl font-bold text-gray-800 mb-6">Recent Files</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {certificateData && (
-                      <div className="file-card cursor-pointer" onClick={() => setShowCertificate(true)}>
-                        <div className="w-full h-48 flex items-center justify-center text-6xl bg-gradient-to-br from-pink-200 to-orange-300">
-                          🎨
+                  {protectedFiles.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400">
+                      No files protected yet
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {protectedFiles.slice(0, 4).map((file, index) => (
+                        <div
+                          key={index}
+                          className="file-card cursor-pointer"
+                          onClick={() => {
+                            setCertificateData(file);
+                            setShowCertificate(true);
+                          }}
+                        >
+                          <div className="w-full h-48 flex items-center justify-center text-6xl bg-gradient-to-br from-pink-200 to-orange-300">
+                            {getFileIcon(file.fileType)}
+                          </div>
+                          <div className="p-5">
+                            <div className="font-semibold text-gray-800 mb-2 truncate" title={file.fileName}>
+                              {file.fileName}
+                            </div>
+                            <div className="text-gray-500 text-sm mb-3">
+                              Protected {getRelativeDate(file.protectedDate)}
+                            </div>
+                            <div className="font-mono bg-gray-100 p-3 rounded-lg text-xs text-gray-600 truncate" title={file.assetId}>
+                              {file.assetId}
+                            </div>
+                          </div>
                         </div>
-                        <div className="p-5">
-                          <div className="font-semibold text-gray-800 mb-2">{certificateData.fileName}</div>
-                          <div className="text-gray-500 text-sm mb-3">Protected just now</div>
-                          <div className="font-mono bg-gray-100 p-3 rounded-lg text-xs text-gray-600">{certificateData.assetId}</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -671,20 +762,41 @@ export default function Home() {
                   <h1 className="text-4xl font-bold text-gray-800 mb-4">My Files</h1>
                   <p className="text-gray-600 mb-8">All your protected files in one place</p>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {certificateData && (
-                      <div className="file-card cursor-pointer" onClick={() => setShowCertificate(true)}>
-                        <div className="w-full h-48 flex items-center justify-center text-6xl bg-gradient-to-br from-pink-200 to-orange-300">
-                          🎨
+                  {protectedFiles.length === 0 ? (
+                    <div className="text-center py-16">
+                      <div className="text-6xl mb-4">📁</div>
+                      <p className="text-gray-500 text-lg mb-2">No protected files yet</p>
+                      <p className="text-gray-400">Upload a file to get started with BloomShield protection</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {protectedFiles.map((file, index) => (
+                        <div
+                          key={index}
+                          className="file-card cursor-pointer"
+                          onClick={() => {
+                            setCertificateData(file);
+                            setShowCertificate(true);
+                          }}
+                        >
+                          <div className="w-full h-48 flex items-center justify-center text-6xl bg-gradient-to-br from-pink-200 to-orange-300">
+                            {getFileIcon(file.fileType)}
+                          </div>
+                          <div className="p-5">
+                            <div className="font-semibold text-gray-800 mb-2 truncate" title={file.fileName}>
+                              {file.fileName}
+                            </div>
+                            <div className="text-gray-500 text-sm mb-3">
+                              Protected {getRelativeDate(file.protectedDate)}
+                            </div>
+                            <div className="font-mono bg-gray-100 p-3 rounded-lg text-xs text-gray-600 truncate" title={file.assetId}>
+                              {file.assetId}
+                            </div>
+                          </div>
                         </div>
-                        <div className="p-5">
-                          <div className="font-semibold text-gray-800 mb-2">{certificateData.fileName}</div>
-                          <div className="text-gray-500 text-sm mb-3">Protected just now</div>
-                          <div className="font-mono bg-gray-100 p-3 rounded-lg text-xs text-gray-600">{certificateData.assetId}</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
