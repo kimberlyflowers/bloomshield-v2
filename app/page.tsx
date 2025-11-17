@@ -273,7 +273,24 @@ export default function Home() {
       showToastMessage('⚠️ Please enter a Shield ID or creator name', 'warning');
       return;
     }
-    showToastMessage(`🔍 Searching for: ${searchQuery}`, 'success');
+
+    // Search through certificate data
+    if (certificateData) {
+      const query = searchQuery.toLowerCase().trim();
+      const assetIdMatch = certificateData.assetId.toLowerCase().includes(query);
+      const fileNameMatch = certificateData.fileName.toLowerCase().includes(query);
+      const creatorMatch = certificateData.creator.toLowerCase().includes(query);
+
+      if (assetIdMatch || fileNameMatch || creatorMatch) {
+        // Found a match - show the certificate
+        setShowCertificate(true);
+        showToastMessage(`✓ Found: ${certificateData.fileName}`, 'success');
+        return;
+      }
+    }
+
+    // No match found
+    showToastMessage(`❌ No results found for: ${searchQuery}`, 'warning');
   };
 
   // Handle login button click - show modal
@@ -321,6 +338,33 @@ export default function Home() {
     } else {
       setCurrentPage('dashboard');
     }
+  };
+
+  // Handle wallet actions
+  const handleAddMoney = () => {
+    alert('💳 Add Money\n\nThis feature would integrate with Stripe or another payment processor to add funds to your BloomShield wallet.\n\nComing soon in production!');
+  };
+
+  const handleWithdraw = () => {
+    alert('💸 Withdraw Funds\n\nThis feature would allow you to transfer your earnings to your connected bank account.\n\nPlease connect a bank account first under Direct Deposit.');
+  };
+
+  const handleConnectBank = () => {
+    alert('🏦 Connect Bank Account\n\nThis feature would integrate with Plaid or Stripe to securely connect your bank account for direct deposits.\n\nComing soon in production!');
+  };
+
+  // Handle upgrade to pro
+  const handleUpgradeToPro = () => {
+    alert('✨ Upgrade to BloomShield Pro\n\nPro features include:\n• Advanced content monitoring across the web\n• Case management for infringement\n• Priority support\n• Unlimited file protection\n\nContact sales@bloomshield.com for pricing.');
+  };
+
+  // Handle create listing
+  const handleCreateListing = () => {
+    if (!certificateData) {
+      alert('📄 Create Listing\n\nTo create a marketplace listing, first protect a file by uploading it on the home page.\n\nThen you can list it here for licensing!');
+      return;
+    }
+    alert(`📄 Create Listing for ${certificateData.fileName}\n\nThis feature would allow you to:\n• Set licensing terms and pricing\n• Choose license types (personal/commercial/exclusive)\n• Publish to the BloomShield marketplace\n\nComing soon in production!`);
   };
 
   return (
@@ -572,7 +616,10 @@ export default function Home() {
                   <div className="bg-gradient-to-r from-pink-500 via-[#FF8C42] to-yellow-400 rounded-2xl p-12 text-center text-white shadow-lg">
                     <h3 className="text-3xl font-bold mb-4">🔍 Unlock Advanced Monitoring</h3>
                     <p className="text-xl mb-8 opacity-95">Track your content across the web and get alerts when copies are detected</p>
-                    <button className="bg-white text-[#FF8C42] font-bold py-4 px-10 rounded-lg hover:shadow-xl transition-all text-lg">
+                    <button
+                      onClick={handleUpgradeToPro}
+                      className="bg-white text-[#FF8C42] font-bold py-4 px-10 rounded-lg hover:shadow-xl transition-all text-lg"
+                    >
                       Upgrade to Pro
                     </button>
                   </div>
@@ -587,7 +634,10 @@ export default function Home() {
                   <div className="bg-gradient-to-r from-pink-500 via-[#FF8C42] to-yellow-400 rounded-2xl p-12 text-center text-white shadow-lg">
                     <h3 className="text-3xl font-bold mb-4">⚖️ Unlock Case Management</h3>
                     <p className="text-xl mb-8 opacity-95">Manage infringement cases and work with legal partners to protect your rights</p>
-                    <button className="bg-white text-[#FF8C42] font-bold py-4 px-10 rounded-lg hover:shadow-xl transition-all text-lg">
+                    <button
+                      onClick={handleUpgradeToPro}
+                      className="bg-white text-[#FF8C42] font-bold py-4 px-10 rounded-lg hover:shadow-xl transition-all text-lg"
+                    >
                       Upgrade to Pro
                     </button>
                   </div>
@@ -687,10 +737,16 @@ export default function Home() {
 
                   {/* Quick Actions */}
                   <div className="grid grid-cols-2 gap-4 mb-8">
-                    <button className="bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-semibold py-4 px-6 rounded-lg transition-all">
+                    <button
+                      onClick={handleAddMoney}
+                      className="bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-semibold py-4 px-6 rounded-lg transition-all"
+                    >
                       + Add Money
                     </button>
-                    <button className="bg-white border-2 border-[#FF8C42] text-[#FF8C42] hover:bg-orange-50 font-semibold py-4 px-6 rounded-lg transition-all">
+                    <button
+                      onClick={handleWithdraw}
+                      className="bg-white border-2 border-[#FF8C42] text-[#FF8C42] hover:bg-orange-50 font-semibold py-4 px-6 rounded-lg transition-all"
+                    >
                       Withdraw
                     </button>
                   </div>
@@ -805,7 +861,10 @@ export default function Home() {
                   <div className="bg-white rounded-xl shadow-md p-16 text-center">
                     <div className="text-6xl mb-4">🏦</div>
                     <p className="text-gray-500 text-lg mb-6">No bank account connected</p>
-                    <button className="bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-bold py-3 px-8 rounded-lg transition-all">
+                    <button
+                      onClick={handleConnectBank}
+                      className="bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-bold py-3 px-8 rounded-lg transition-all"
+                    >
                       Connect Bank Account
                     </button>
                   </div>
@@ -873,7 +932,10 @@ export default function Home() {
             <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-8 mb-8 text-white shadow-lg">
               <h2 className="text-2xl font-bold mb-2">List Your Protected Content</h2>
               <p className="text-white/90 mb-6">Set licensing terms and earn passive income from your creations</p>
-              <button className="bg-white text-purple-600 font-bold py-3 px-8 rounded-lg hover:shadow-lg transition-all">
+              <button
+                onClick={handleCreateListing}
+                className="bg-white text-purple-600 font-bold py-3 px-8 rounded-lg hover:shadow-lg transition-all"
+              >
                 Create Listing
               </button>
             </div>

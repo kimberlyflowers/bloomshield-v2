@@ -25,15 +25,77 @@ export default function CertificateModal({ show, onClose, data, onNavigateToDash
   if (!show) return null;
 
   const handleDownload = () => {
-    alert('Certificate download feature coming soon!');
+    // Create a text file with certificate details
+    const certificateText = `
+BLOOMSHIELD CERTIFICATE OF PROTECTION
+=====================================
+
+Asset ID: ${data.assetId}
+File Name: ${data.fileName}
+File Type: ${data.fileType}
+File Size: ${data.fileSize}
+Protected On: ${data.protectedDate}
+
+CREATOR INFORMATION
+-------------------
+Creator: ${data.creator}
+Contact: ${data.email}
+
+PROTECTION HASHES
+-----------------
+Legal Hash (SHA-256): ${data.legalHash}
+Content Hash: ${data.contentHash}
+Floral Hash: ${data.floralHash}
+
+BLOCKCHAIN VERIFICATION
+-----------------------
+Transaction: ${data.blockchainTx}
+
+AUTHENTICITY VERIFIED ✓
+This work is timestamped and authenticated on the blockchain.
+Protected by BloomShield 🌸
+
+For verification, visit: https://bloomshield.com/verify/${data.assetId.replace('🌸 ', '')}
+`;
+
+    const blob = new Blob([certificateText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `BloomShield_Certificate_${data.fileName}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
-  const handleShare = () => {
-    alert('Certificate sharing feature coming soon!');
+  const handleShare = async () => {
+    const shareUrl = `https://bloomshield.com/verify/${data.assetId.replace('🌸 ', '')}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      alert('✓ Certificate link copied to clipboard!\n\n' + shareUrl);
+    } catch (err) {
+      // Fallback for browsers that don't support clipboard API
+      alert('Share this verification link:\n\n' + shareUrl);
+    }
   };
 
   const handleLicense = () => {
-    alert('License request feature coming soon!');
+    const subject = encodeURIComponent(`License Request for ${data.fileName}`);
+    const body = encodeURIComponent(
+`Hi ${data.creator},
+
+I'd like to request a license for your work:
+
+Asset ID: ${data.assetId}
+File Name: ${data.fileName}
+Protected Date: ${data.protectedDate}
+
+Please let me know the licensing terms and pricing options available.
+
+Thank you!`
+    );
+    window.location.href = `mailto:${data.email}?subject=${subject}&body=${body}`;
   };
 
   return (
