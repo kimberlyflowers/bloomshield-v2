@@ -2308,6 +2308,7 @@ export default function Home() {
               onClick={() => {
                 localStorage.setItem('seedPhraseAcknowledged', 'true');
                 setShowSeedPhraseModal(false);
+                setCurrentPage('dashboard');
                 showToastMessage('✅ Wallet created! Your ownership is now permanent.', 'success');
               }}
               className="w-full bg-gray-300 text-white py-4 rounded-lg font-bold text-lg cursor-not-allowed"
