@@ -4,9 +4,10 @@ interface TopBarProps {
   onLogin: () => void;
   isLoggedIn: boolean;
   onToggleSidebar?: () => void;
+  onLogoClick?: () => void;
 }
 
-export default function TopBar({ onLogin, isLoggedIn, onToggleSidebar }: TopBarProps) {
+export default function TopBar({ onLogin, isLoggedIn, onToggleSidebar, onLogoClick }: TopBarProps) {
   return (
     <div className="bg-white px-4 md:px-8 py-4 shadow-md flex justify-between items-center sticky top-0 z-50">
       <div className="flex items-center gap-2 md:gap-4">
@@ -21,7 +22,11 @@ export default function TopBar({ onLogin, isLoggedIn, onToggleSidebar }: TopBarP
             ☰
           </button>
         )}
-        <div className="text-xl md:text-2xl font-semibold text-[#FF8C42]">
+        <div
+          className="text-xl md:text-2xl font-semibold text-[#FF8C42] cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={onLogoClick}
+          title="Go to homepage"
+        >
           🌸 BloomShield
         </div>
       </div>
