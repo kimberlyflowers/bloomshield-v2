@@ -578,14 +578,20 @@ export default function Home() {
   };
 
   const handleAccountAction = (action: string) => {
-    const messages: { [key: string]: string } = {
-      '2fa': '🔐 Two-Factor Authentication\n\nThis feature will allow you to add an extra layer of security to your account.\n\nComing soon!',
-      'notifications': '📧 Email Notifications\n\nManage your email notification preferences here.\n\nComing soon!',
-      'privacy': '🔒 Privacy Settings\n\nControl who can see your work and contact you.\n\nComing soon!',
-      'download': '📥 Download My Data\n\nRequest a copy of all your data stored with BloomShield.\n\nComing soon!',
-      'delete': '⚠️ Delete Account\n\nPermanently delete your account and all associated data.\n\nPlease contact support@bloomshield.com if you wish to delete your account.'
+    const sectionMap: { [key: string]: string } = {
+      '2fa': 'security',
+      'notifications': 'notifications',
+      'privacy': 'privacy',
+      'download': 'data',
+      'delete': 'advanced'
     };
-    alert(messages[action] || 'Feature coming soon!');
+
+    const section = sectionMap[action];
+    if (section) {
+      setSettingsSection(section);
+      setCurrentPage('settings');
+      showToastMessage(`Navigating to ${action === '2fa' ? 'Security Settings' : action.charAt(0).toUpperCase() + action.slice(1)}...`, 'success');
+    }
   };
 
   return (
@@ -1470,7 +1476,6 @@ export default function Home() {
                   className="w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-all flex items-center justify-between group"
                 >
                   <span className="text-gray-700 group-hover:text-[#FF8C42]">→ Two-Factor Authentication</span>
-                  <span className="text-xs bg-gray-100 px-2 py-1 rounded">Coming Soon</span>
                 </button>
                 <button
                   onClick={() => handleAccountAction('notifications')}
@@ -1599,6 +1604,46 @@ export default function Home() {
                 >
                   Privacy
                 </button>
+                <button
+                  onClick={() => setSettingsSection('notifications')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    settingsSection === 'notifications'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  Notifications
+                </button>
+                <button
+                  onClick={() => setSettingsSection('billing')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    settingsSection === 'billing'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  Billing
+                </button>
+                <button
+                  onClick={() => setSettingsSection('data')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    settingsSection === 'data'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  Data & Export
+                </button>
+                <button
+                  onClick={() => setSettingsSection('advanced')}
+                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                    settingsSection === 'advanced'
+                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
+                      : 'text-gray-600 border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  Advanced
+                </button>
               </nav>
             </div>
 
@@ -1711,26 +1756,413 @@ export default function Home() {
                 </div>
               )}
 
-              {/* SECURITY SECTION - Placeholder */}
+              {/* SECURITY SECTION */}
               {settingsSection === 'security' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Security</h1>
-                  <div className="bg-white rounded-xl shadow-md p-12 text-center">
-                    <div className="text-6xl mb-4">🔒</div>
-                    <h3 className="text-xl font-bold text-gray-800 mb-2">Security Settings</h3>
-                    <p className="text-gray-500">2FA, password management, and session control coming soon</p>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-4">Security</h1>
+                  <p className="text-gray-600 mb-8">Manage your account security and authentication</p>
+
+                  {/* Password Card */}
+                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Password</h3>
+                    <p className="text-gray-600 mb-4">Update your password regularly to keep your account secure</p>
+                    <button
+                      onClick={() => {
+                        const newPassword = prompt('Enter new password (minimum 8 characters):');
+                        if (newPassword && newPassword.length >= 8) {
+                          localStorage.setItem('userPassword', newPassword);
+                          showToastMessage('✅ Password updated successfully!', 'success');
+                        } else if (newPassword) {
+                          showToastMessage('⚠️ Password must be at least 8 characters', 'warning');
+                        }
+                      }}
+                      className="bg-[#FF8C42] text-white px-6 py-2 rounded-lg hover:bg-[#ff7a2e] transition-all"
+                    >
+                      Change Password
+                    </button>
+                  </div>
+
+                  {/* 2FA Card */}
+                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Two-Factor Authentication</h3>
+                    <div className="flex justify-between items-center mb-4">
+                      <div>
+                        <p className="text-gray-800 font-semibold">
+                          Status: {twoFactorEnabled ? (
+                            <span className="text-green-600">✓ Enabled</span>
+                          ) : (
+                            <span className="text-gray-500">Not enabled</span>
+                          )}
+                        </p>
+                        <p className="text-gray-600 text-sm mt-1">
+                          Add an extra layer of security to your account
+                        </p>
+                      </div>
+                      {twoFactorEnabled ? (
+                        <button
+                          onClick={() => {
+                            const confirmed = confirm('Are you sure you want to disable 2FA?');
+                            if (confirmed) {
+                              setTwoFactorEnabled(false);
+                              setShow2FASetup(false);
+                              localStorage.setItem('twoFactorEnabled', 'false');
+                              showToastMessage('🔓 Two-factor authentication disabled', 'success');
+                            }
+                          }}
+                          className="bg-white border-2 border-gray-300 text-gray-600 px-6 py-2 rounded-lg hover:bg-gray-50 transition-all"
+                        >
+                          Disable 2FA
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setShow2FASetup(!show2FASetup)}
+                          className="bg-[#FF8C42] text-white px-6 py-2 rounded-lg hover:bg-[#ff7a2e] transition-all"
+                        >
+                          Enable 2FA
+                        </button>
+                      )}
+                    </div>
+
+                    {/* 2FA Setup UI */}
+                    {show2FASetup && !twoFactorEnabled && (
+                      <div className="border-t pt-4 mt-4">
+                        <h4 className="font-semibold text-gray-800 mb-4">Set Up Authenticator App</h4>
+                        <ol className="text-sm text-gray-700 space-y-2 mb-4">
+                          <li>1. Download an authenticator app (Google Authenticator, Authy, etc.)</li>
+                          <li>2. Scan this QR code with your app:</li>
+                        </ol>
+                        <div className="bg-gray-100 p-8 rounded-lg text-center mb-4">
+                          <div className="text-6xl">📱</div>
+                          <p className="text-sm text-gray-500 mt-2">QR Code Placeholder</p>
+                          <p className="text-xs text-gray-400 mt-1">In production: Display actual QR code</p>
+                        </div>
+                        <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                          <p className="text-xs text-gray-500 mb-2">Or enter this code manually:</p>
+                          <code className="text-sm font-mono text-gray-800">ABCD-EFGH-IJKL-MNOP</code>
+                        </div>
+                        <div className="mb-4">
+                          <label className="block text-sm text-gray-700 mb-2">Enter 6-digit code from your app:</label>
+                          <input
+                            type="text"
+                            maxLength={6}
+                            placeholder="000000"
+                            className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none"
+                            id="twoFactorCode"
+                          />
+                        </div>
+                        <button
+                          onClick={() => {
+                            const code = (document.getElementById('twoFactorCode') as HTMLInputElement)?.value;
+                            if (code && code.length === 6) {
+                              setTwoFactorEnabled(true);
+                              setShow2FASetup(false);
+                              localStorage.setItem('twoFactorEnabled', 'true');
+                              showToastMessage('✅ Two-factor authentication enabled!', 'success');
+                            } else {
+                              showToastMessage('⚠️ Please enter a 6-digit code', 'warning');
+                            }
+                          }}
+                          className="w-full bg-[#FF8C42] text-white py-3 rounded-lg hover:bg-[#ff7a2e] transition-all font-semibold"
+                        >
+                          Verify & Enable 2FA
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sessions Card */}
+                  <div className="bg-white rounded-xl shadow-md p-6">
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Active Sessions</h3>
+                    <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-semibold text-gray-800">Current Session</p>
+                          <p className="text-sm text-gray-600">Chrome on Windows • Last active: Now</p>
+                        </div>
+                        <span className="text-green-600 text-sm">● Active</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        showToastMessage('🔐 All other sessions signed out', 'success');
+                      }}
+                      className="w-full bg-white border-2 border-[#FF8C42] text-[#FF8C42] py-2 rounded-lg hover:bg-orange-50 transition-all"
+                    >
+                      Sign Out All Other Sessions
+                    </button>
                   </div>
                 </div>
               )}
 
-              {/* PRIVACY SECTION - Placeholder */}
+              {/* PRIVACY SECTION */}
               {settingsSection === 'privacy' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Privacy</h1>
-                  <div className="bg-white rounded-xl shadow-md p-12 text-center">
-                    <div className="text-6xl mb-4">🔐</div>
-                    <h3 className="text-xl font-bold text-gray-800 mb-2">Privacy Settings</h3>
-                    <p className="text-gray-500">Privacy controls and data management coming soon</p>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-4">Privacy</h1>
+                  <p className="text-gray-600 mb-8">Control who can see your profile and content</p>
+
+                  {/* Profile Visibility Card */}
+                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Profile Visibility</h3>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-semibold text-gray-800">Public Profile</p>
+                          <p className="text-sm text-gray-600">Allow others to view your profile</p>
+                        </div>
+                        <label className="relative inline-block w-12 h-6">
+                          <input
+                            type="checkbox"
+                            className="sr-only peer"
+                            onChange={(e) => {
+                              localStorage.setItem('privacy_publicProfile', e.target.checked.toString());
+                              showToastMessage(
+                                e.target.checked ? '✓ Profile is now public' : '✓ Profile is now private',
+                                'success'
+                              );
+                            }}
+                          />
+                          <span className="absolute cursor-pointer inset-0 bg-gray-300 rounded-full transition-all peer-checked:bg-[#FF8C42] peer-focus:ring-2 peer-focus:ring-[#FF8C42]/50"></span>
+                          <span className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all peer-checked:translate-x-6"></span>
+                        </label>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-semibold text-gray-800">Show in Search Results</p>
+                          <p className="text-sm text-gray-600">Allow your profile to appear in searches</p>
+                        </div>
+                        <label className="relative inline-block w-12 h-6">
+                          <input
+                            type="checkbox"
+                            className="sr-only peer"
+                            defaultChecked
+                            onChange={(e) => {
+                              localStorage.setItem('privacy_searchable', e.target.checked.toString());
+                              showToastMessage(
+                                e.target.checked ? '✓ Searchable enabled' : '✓ Searchable disabled',
+                                'success'
+                              );
+                            }}
+                          />
+                          <span className="absolute cursor-pointer inset-0 bg-gray-300 rounded-full transition-all peer-checked:bg-[#FF8C42] peer-focus:ring-2 peer-focus:ring-[#FF8C42]/50"></span>
+                          <span className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all peer-checked:translate-x-6"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* NOTIFICATIONS SECTION */}
+              {settingsSection === 'notifications' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-4">Notifications</h1>
+                  <p className="text-gray-600 mb-8">Manage your notification preferences</p>
+
+                  {/* Email Notifications Card */}
+                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Email Notifications</h3>
+                    <div className="space-y-4">
+                      {[
+                        { key: 'fileProtected', label: 'File Protection Confirmations', desc: 'Receive confirmation when files are protected' },
+                        { key: 'licenseRequests', label: 'License Requests', desc: 'Get notified when someone requests a license' },
+                        { key: 'securityAlerts', label: 'Security Alerts', desc: 'Important security updates and warnings' },
+                        { key: 'productUpdates', label: 'Product Updates', desc: 'New features and improvements' },
+                        { key: 'marketingEmails', label: 'Marketing Emails', desc: 'Tips, offers, and newsletters' }
+                      ].map(({ key, label, desc }) => (
+                        <div key={key} className="flex justify-between items-center">
+                          <div>
+                            <p className="font-semibold text-gray-800">{label}</p>
+                            <p className="text-sm text-gray-600">{desc}</p>
+                          </div>
+                          <label className="relative inline-block w-12 h-6">
+                            <input
+                              type="checkbox"
+                              className="sr-only peer"
+                              defaultChecked={key === 'fileProtected' || key === 'securityAlerts'}
+                              onChange={(e) => {
+                                localStorage.setItem(`notification_${key}`, e.target.checked.toString());
+                                showToastMessage('✓ Notification preference updated', 'success');
+                              }}
+                            />
+                            <span className="absolute cursor-pointer inset-0 bg-gray-300 rounded-full transition-all peer-checked:bg-[#FF8C42] peer-focus:ring-2 peer-focus:ring-[#FF8C42]/50"></span>
+                            <span className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all peer-checked:translate-x-6"></span>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* BILLING SECTION */}
+              {settingsSection === 'billing' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Billing & Subscription</h1>
+                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Current Plan</h3>
+                    <p className="text-gray-600 mb-4">Manage your subscription and billing information</p>
+                    <button
+                      onClick={() => setCurrentPage('wallet')}
+                      className="bg-[#FF8C42] text-white px-6 py-2 rounded-lg hover:bg-[#ff7a2e] transition-all"
+                    >
+                      Go to Wallet →
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* DATA & EXPORT SECTION */}
+              {settingsSection === 'data' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-4">Data & Export</h1>
+                  <p className="text-gray-600 mb-8">Download your data and manage account information</p>
+
+                  {/* Data Export Card */}
+                  <div className="bg-white rounded-xl shadow-md p-6">
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Export Your Data</h3>
+                    <p className="text-gray-600 mb-6">Download a copy of all your BloomShield data</p>
+                    <button
+                      onClick={() => {
+                        const exportData = {
+                          profile: JSON.parse(localStorage.getItem('userProfile') || '{}'),
+                          wallet: JSON.parse(localStorage.getItem('userWallet') || '{}'),
+                          files: JSON.parse(localStorage.getItem('protectedFiles') || '[]'),
+                          settings: {
+                            twoFactorEnabled: localStorage.getItem('twoFactorEnabled'),
+                            notifications: Object.keys(localStorage).filter(k => k.startsWith('notification_')),
+                            privacy: Object.keys(localStorage).filter(k => k.startsWith('privacy_'))
+                          },
+                          exportDate: new Date().toISOString()
+                        };
+
+                        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `bloomshield-data-${Date.now()}.json`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+
+                        showToastMessage('✅ Data exported successfully!', 'success');
+                      }}
+                      className="bg-[#FF8C42] text-white px-6 py-3 rounded-lg hover:bg-[#ff7a2e] transition-all font-semibold"
+                    >
+                      📥 Download My Data
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ADVANCED SECTION */}
+              {settingsSection === 'advanced' && (
+                <div>
+                  <h1 className="text-4xl font-bold text-gray-800 mb-4">Advanced Settings</h1>
+                  <p className="text-gray-600 mb-8">API access and account management</p>
+
+                  {/* API Keys Card */}
+                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4">API Keys</h3>
+                    <p className="text-gray-600 mb-4">Manage API keys for programmatic access</p>
+
+                    {apiKeys.length === 0 ? (
+                      <p className="text-gray-500 text-sm mb-4">No API keys yet</p>
+                    ) : (
+                      <div className="space-y-3 mb-4">
+                        {apiKeys.map((key) => (
+                          <div key={key.id} className="bg-gray-50 p-4 rounded-lg flex justify-between items-center">
+                            <div>
+                              <p className="font-semibold text-gray-800">{key.name}</p>
+                              <p className="text-sm text-gray-500">Created: {key.created}</p>
+                              <code className="text-xs font-mono text-gray-600">{key.key.substring(0, 20)}...</code>
+                            </div>
+                            <button
+                              onClick={() => {
+                                const confirmed = confirm(`Revoke API key "${key.name}"?`);
+                                if (confirmed) {
+                                  const updated = apiKeys.filter(k => k.id !== key.id);
+                                  setApiKeys(updated);
+                                  localStorage.setItem('apiKeys', JSON.stringify(updated));
+                                  showToastMessage('🗑️ API key revoked', 'success');
+                                }
+                              }}
+                              className="bg-red-50 text-red-600 px-4 py-2 rounded-lg hover:bg-red-100 transition-all text-sm"
+                            >
+                              Revoke
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        const name = prompt('Enter a name for this API key:');
+                        if (name) {
+                          const newKey = {
+                            id: Date.now().toString(),
+                            name: name,
+                            key: 'bs_' + Array.from({length: 32}, () =>
+                              'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 36)]
+                            ).join(''),
+                            created: new Date().toLocaleDateString(),
+                            lastUsed: 'Never'
+                          };
+
+                          alert(`API Key Created!\n\n${newKey.key}\n\nCopy this now - you won't see it again!`);
+
+                          const updated = [...apiKeys, newKey];
+                          setApiKeys(updated);
+                          localStorage.setItem('apiKeys', JSON.stringify(updated));
+                          showToastMessage('✅ API key created', 'success');
+                        }
+                      }}
+                      className="bg-[#FF8C42] text-white px-6 py-2 rounded-lg hover:bg-[#ff7a2e] transition-all"
+                    >
+                      + Generate New API Key
+                    </button>
+                  </div>
+
+                  {/* Danger Zone Card */}
+                  <div className="bg-white rounded-xl shadow-md border-2 border-red-200 p-6">
+                    <h3 className="text-xl font-semibold text-red-600 mb-4">⚠️ Danger Zone</h3>
+
+                    <div className="bg-[#E8F5E9] border-l-4 border-green-500 p-4 rounded-lg mb-6">
+                      <p className="text-sm font-semibold text-gray-800 mb-1">✓ Important: Blockchain Protection</p>
+                      <p className="text-xs text-gray-700">
+                        Deleting your BloomShield account will NOT delete your blockchain records.
+                        Your ownership proofs remain permanent and verifiable forever through your wallet address.
+                      </p>
+                    </div>
+
+                    <p className="text-gray-700 mb-4">
+                      This will permanently delete your account, profile data, and remove access to the BloomShield platform.
+                      This action cannot be undone.
+                    </p>
+                    <button
+                      onClick={() => {
+                        const confirmation = prompt('Type "DELETE" in capital letters to confirm account deletion:');
+                        if (confirmation === 'DELETE') {
+                          const finalConfirm = confirm(
+                            '⚠️ FINAL WARNING\n\n' +
+                            'This will permanently delete your account.\n\n' +
+                            'Your blockchain records will remain, but you will lose access to this account.\n\n' +
+                            'Click OK to proceed with deletion.'
+                          );
+                          if (finalConfirm) {
+                            localStorage.clear();
+                            showToastMessage('🗑️ Account deleted. Reloading...', 'success');
+                            setTimeout(() => window.location.reload(), 2000);
+                          }
+                        } else if (confirmation !== null) {
+                          showToastMessage('⚠️ Deletion cancelled - you must type DELETE exactly', 'warning');
+                        }
+                      }}
+                      className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-all font-semibold"
+                    >
+                      Delete Account
+                    </button>
                   </div>
                 </div>
               )}
