@@ -85,7 +85,7 @@ export default function AuthModal({ show, onClose, onLoginSuccess, onSignUpSucce
         return;
       }
 
-      setSuccessMessage(`✅ Account created successfully!\n\n📧 Please check your email (${signupEmail}) for a verification link. You must verify your email before you can log in.\n\nCheck your spam folder if you don't see it.`);
+      setSuccessMessage(`Verification email sent to ${signupEmail}\n\nPlease check your inbox and click the verification link to complete your registration. If you don't see the email, check your spam folder.`);
 
       // Reset form
       setSignupName('');
