@@ -316,31 +316,26 @@ export default function Home() {
 
       // Step 4: Save to Database
       setUploadStatus('Saving protection record...');
-
-      // Get user info for creator fields
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      const { data: dbData, error: dbError } = await supabase
-        .from('assets')
+      const { data: dbData, error: dbError} = await supabase
+        .from('protected_files')
         .insert({
-          floral_id: hashes.floral,
           file_name: fileToUpload.name,
-          file_type: fileToUpload.type,
           file_size: fileToUpload.size,
-          creator_name: user.name,
-          creator_uid: user.id,
-          creator_wallet: user.walletAddress,
+          mime_type: fileToUpload.type,
+          storage_path: uploadData?.path || fileName,
           legal_hash: hashes.legal,
+          content_hash: hashes.content,
+          floral_hash: hashes.floral,
           blockchain_tx: blockchainTransactionHash,
-          ipfs_hash: '', // Will be populated later
-          is_listed: false,
+          blockchain_timestamp: blockchainTimestamp,
         })
         .select()
         .single();
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('Database error:', dbError);
+        throw new Error(`Database error: ${dbError.message || 'Failed to save protection record'}`);
+      }
 
       setRecordId(dbData.id);
 
