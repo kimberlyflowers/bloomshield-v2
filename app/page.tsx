@@ -316,7 +316,7 @@ export default function Home() {
 
       // Step 4: Save to Database
       setUploadStatus('Saving protection record...');
-      const { data: dbData, error: dbError } = await supabase
+      const { data: dbData, error: dbError} = await supabase
         .from('protected_files')
         .insert({
           file_name: fileToUpload.name,
@@ -332,7 +332,10 @@ export default function Home() {
         .select()
         .single();
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('Database error:', dbError);
+        throw new Error(`Database error: ${dbError.message || 'Failed to save protection record'}`);
+      }
 
       setRecordId(dbData.id);
 
