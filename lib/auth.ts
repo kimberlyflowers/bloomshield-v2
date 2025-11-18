@@ -171,15 +171,27 @@ export async function login({ email, password }: LoginData): Promise<{ success: 
 
     // TEMPORARY FIX: Create profile from auth data to bypass database query
     // TODO: Fix RLS policies and database query
-    const userName = authData.user.user_metadata?.name || authData.user.email?.split('@')[0] || 'User';
+
+    // Validate we have required user data
+    if (!authData.user || !authData.user.id || !authData.user.email) {
+      console.error('Invalid user data from auth:', authData);
+      return {
+        success: false,
+        error: { message: 'Invalid authentication data received' }
+      };
+    }
+
+    const userName = authData.user.user_metadata?.name || authData.user.email.split('@')[0] || 'User';
+    const userId = authData.user.id || '';
+    const walletAddress = '0x' + (userId.replace(/-/g, '') + '0000000000000000000000000000000000000000').substring(0, 40);
 
     const userProfile: UserProfile = {
       id: authData.user.id,
-      email: authData.user.email!,
+      email: authData.user.email,
       name: userName,
-      walletAddress: '0x' + authData.user.id.replace(/-/g, '').substring(0, 40),
+      walletAddress: walletAddress,
       walletSeedPhrase: 'temporary seed phrase - please update in settings',
-      createdAt: authData.user.created_at,
+      createdAt: authData.user.created_at || new Date().toISOString(),
       accountType: 'free',
       role: 'creator',
       emailVerified: !!authData.user.email_confirmed_at,
