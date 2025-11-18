@@ -11,7 +11,36 @@ export async function POST(request: Request) {
 
     console.log('🔗 Creating blockchain timestamp for:', legalHash);
 
-    // Initialize ThirdWeb SDK on Base network (90% cheaper gas than Polygon)
+    // Check if contract address is configured
+    const contractAddress = process.env.THIRDWEB_CONTRACT_ADDRESS || '';
+
+    // If no contract address, return simulated blockchain response
+    if (!contractAddress || contractAddress === '0x_your_contract_address_here') {
+      console.log('⚠️  No contract deployed - using simulated blockchain mode');
+
+      const simulatedTxHash = `0xSIM${Date.now().toString(16)}${Math.random().toString(16).slice(2, 18)}`;
+      const simulatedBlockNumber = Math.floor(Date.now() / 1000);
+
+      return NextResponse.json({
+        success: true,
+        simulated: true,
+        blockchain: {
+          chain: 'base',
+          contractAddress: 'Not deployed (simulated mode)',
+          transactionHash: simulatedTxHash,
+          blockNumber: simulatedBlockNumber,
+          timestamp: Date.now(),
+          explorer: `https://basescan.org/tx/${simulatedTxHash}`,
+        },
+        hashes: {
+          legalHash,
+          contentHash,
+          floralHash,
+        },
+      });
+    }
+
+    // Real blockchain mode - Initialize ThirdWeb SDK on Base network
     const sdk = ThirdwebSDK.fromPrivateKey(
       process.env.THIRDWEB_PRIVATE_KEY || '',
       'base',
@@ -22,7 +51,6 @@ export async function POST(request: Request) {
     );
 
     // Get the contract
-    const contractAddress = process.env.THIRDWEB_CONTRACT_ADDRESS || '';
     const contract = await sdk.getContract(contractAddress);
 
     // Create blockchain timestamp transaction
@@ -37,6 +65,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
+      simulated: false,
       blockchain: {
         chain: 'base',
         contractAddress: contractAddress,
