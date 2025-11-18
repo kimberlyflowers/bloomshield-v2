@@ -85,7 +85,7 @@ export default function AuthModal({ show, onClose, onLoginSuccess, onSignUpSucce
         return;
       }
 
-      setSuccessMessage('Account created! Please check your email to verify your account before logging in.');
+      setSuccessMessage(`✅ Account created successfully!\n\n📧 Please check your email (${signupEmail}) for a verification link. You must verify your email before you can log in.\n\nCheck your spam folder if you don't see it.`);
 
       // Reset form
       setSignupName('');
@@ -99,11 +99,8 @@ export default function AuthModal({ show, onClose, onLoginSuccess, onSignUpSucce
         onSignUpSuccess(result.userId);
       }
 
-      // Switch to login view after 3 seconds
-      setTimeout(() => {
-        setCurrentView('login');
-        setSuccessMessage(null);
-      }, 3000);
+      // Don't auto-switch - let user read the message and close manually
+      setLoading(false);
 
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');
@@ -237,8 +234,8 @@ export default function AuthModal({ show, onClose, onLoginSuccess, onSignUpSucce
 
         {/* Success message */}
         {successMessage && (
-          <div className="mb-4 p-4 bg-green-50 border-l-4 border-green-500 rounded">
-            <p className="text-green-700 text-sm">{successMessage}</p>
+          <div className="mb-4 p-6 bg-green-50 border-2 border-green-500 rounded-lg">
+            <p className="text-green-700 text-base whitespace-pre-line font-medium">{successMessage}</p>
           </div>
         )}
 
