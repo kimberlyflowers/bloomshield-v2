@@ -11,10 +11,10 @@ export async function POST(request: Request) {
 
     console.log('🔗 Creating blockchain timestamp for:', legalHash);
 
-    // Initialize ThirdWeb SDK
+    // Initialize ThirdWeb SDK on Base network (90% cheaper gas than Polygon)
     const sdk = ThirdwebSDK.fromPrivateKey(
       process.env.THIRDWEB_PRIVATE_KEY || '',
-      'polygon',
+      'base',
       {
         clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID,
         secretKey: process.env.THIRDWEB_SECRET_KEY,
@@ -38,12 +38,12 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       blockchain: {
-        chain: 'polygon',
+        chain: 'base',
         contractAddress: contractAddress,
         transactionHash: tx.receipt.transactionHash,
         blockNumber: tx.receipt.blockNumber,
         timestamp: Date.now(),
-        explorer: `https://polygonscan.com/tx/${tx.receipt.transactionHash}`,
+        explorer: `https://basescan.org/tx/${tx.receipt.transactionHash}`,
       },
       hashes: {
         legalHash,
@@ -75,7 +75,7 @@ export async function GET(request: Request) {
   try {
     const sdk = ThirdwebSDK.fromPrivateKey(
       process.env.THIRDWEB_PRIVATE_KEY || '',
-      'polygon',
+      'base',
       {
         clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID,
         secretKey: process.env.THIRDWEB_SECRET_KEY,
