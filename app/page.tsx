@@ -88,6 +88,7 @@ export default function Home() {
   // Settings page state
   const [settingsSection, setSettingsSection] = useState('account');
   const [showSeedPhraseModal, setShowSeedPhraseModal] = useState(false);
+  const [seedPhraseAcknowledged, setSeedPhraseAcknowledged] = useState(false);
   const [userWallet, setUserWallet] = useState<any>(null);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [show2FASetup, setShow2FASetup] = useState(false);
@@ -2724,7 +2725,18 @@ export default function Home() {
       {/* Seed Phrase Modal - Shows on first login */}
       {showSeedPhraseModal && userWallet && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[3000] p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl">
+          <div className="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl relative">
+            {/* Close button */}
+            <button
+              onClick={() => {
+                setShowSeedPhraseModal(false);
+                setSeedPhraseAcknowledged(false);
+              }}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-all"
+            >
+              ×
+            </button>
+
             <div className="text-center mb-6">
               <div className="text-6xl mb-4">🔑</div>
               <h2 className="text-3xl font-bold text-gray-800 mb-2">Your Ownership Wallet Created</h2>
@@ -2768,31 +2780,26 @@ export default function Home() {
               <label className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
+                  checked={seedPhraseAcknowledged}
+                  onChange={(e) => setSeedPhraseAcknowledged(e.target.checked)}
                   className="w-5 h-5 mr-3 cursor-pointer accent-[#FF8C42]"
-                  onChange={(e) => {
-                    const btn = document.getElementById('confirmSeedBtn') as HTMLButtonElement;
-                    if (btn) {
-                      btn.disabled = !e.target.checked;
-                      btn.className = e.target.checked
-                        ? 'w-full bg-[#FF8C42] text-white py-4 rounded-lg font-bold text-lg cursor-pointer hover:bg-[#ff7a2e] transition-all'
-                        : 'w-full bg-gray-300 text-white py-4 rounded-lg font-bold text-lg cursor-not-allowed';
-                    }
-                  }}
                 />
                 <span className="text-gray-700">I have written down my recovery phrase in a safe place</span>
               </label>
             </div>
 
             <button
-              id="confirmSeedBtn"
-              disabled
+              disabled={!seedPhraseAcknowledged}
               onClick={() => {
                 localStorage.setItem('seedPhraseAcknowledged', 'true');
                 setShowSeedPhraseModal(false);
+                setSeedPhraseAcknowledged(false);
                 setCurrentPage('dashboard');
                 showToastMessage('✅ Wallet created! Your ownership is now permanent.', 'success');
               }}
-              className="w-full bg-gray-300 text-white py-4 rounded-lg font-bold text-lg cursor-not-allowed"
+              className={seedPhraseAcknowledged
+                ? 'w-full bg-[#FF8C42] text-white py-4 rounded-lg font-bold text-lg cursor-pointer hover:bg-[#ff7a2e] transition-all'
+                : 'w-full bg-gray-300 text-white py-4 rounded-lg font-bold text-lg cursor-not-allowed'}
             >
               Continue to Dashboard
             </button>
