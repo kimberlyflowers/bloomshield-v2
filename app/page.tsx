@@ -493,6 +493,18 @@ export default function Home() {
 
   // Handle successful login
   const handleLoginSuccess = (user: UserProfile) => {
+    // Update app state with logged in user
+    setCurrentUser(user);
+    setIsLoggedIn(true);
+
+    // Set wallet from user profile
+    if (user.walletAddress) {
+      setUserWallet({
+        address: user.walletAddress,
+        seedPhrase: user.walletSeedPhrase || ''
+      });
+    }
+
     showToastMessage(`🔐 Welcome back, ${user.name}!`, 'success');
     setCurrentPage('dashboard');
 
