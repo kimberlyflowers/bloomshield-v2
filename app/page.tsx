@@ -9,6 +9,7 @@ import ProcessingOverlay from '@/components/ProcessingOverlay';
 import AuthModal from '@/components/AuthModal';
 import { onAuthStateChange, logout, generateUserWallet } from '@/lib/auth';
 import { UserProfile } from '@/types/user';
+import { supabase } from '@/lib/supabase';
 
 export default function Home() {
   // Auth state
@@ -108,6 +109,64 @@ export default function Home() {
   const [showListingModal, setShowListingModal] = useState(false);
   const [assetToList, setAssetToList] = useState<any>(null);
 
+  // Function to load protected files from database
+  const loadProtectedFilesFromDatabase = async (userId: string) => {
+    try {
+      console.log('Loading protected files for user:', userId);
+
+      const { data, error } = await supabase
+        .from('protected_files')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading protected files:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        console.log(`✅ Loaded ${data.length} protected files from database`);
+
+        // Transform database records to match the app's format
+        const formattedFiles = data.map((file: any) => ({
+          assetId: file.floral_hash || `BS-${file.id}`,
+          fileName: file.file_name,
+          fileType: file.mime_type || 'application/octet-stream',
+          fileSize: formatFileSize(file.file_size),
+          protectedDate: file.blockchain_timestamp || file.created_at,
+          creator: 'User', // TODO: Get from user profile
+          email: 'user@example.com', // TODO: Get from user profile
+          legalHash: file.legal_hash,
+          contentHash: file.content_hash,
+          floralHash: file.floral_hash,
+          blockchainTx: file.blockchain_tx,
+          ownerWallet: null,
+          ipfsHash: null,
+          isListed: false,
+          salePrice: 0
+        }));
+
+        setProtectedFiles(formattedFiles);
+
+        // Also save to localStorage as backup
+        localStorage.setItem('protectedFiles', JSON.stringify(formattedFiles));
+      } else {
+        console.log('No protected files found for user');
+        setProtectedFiles([]);
+      }
+    } catch (err) {
+      console.error('Error loading files from database:', err);
+    }
+  };
+
+  // Helper function to format file size
+  const formatFileSize = (bytes: number): string => {
+    if (!bytes) return '0 B';
+    const mb = bytes / (1024 * 1024);
+    return mb >= 1 ? `${mb.toFixed(2)} MB` : `${(bytes / 1024).toFixed(2)} KB`;
+  };
+
   // Load protected files and marketplace assets from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -152,6 +211,9 @@ export default function Home() {
           address: user.walletAddress,
           seedPhrase: user.walletSeedPhrase
         });
+
+        // Load user's protected files from database
+        loadProtectedFilesFromDatabase(user.id);
 
         // Update profile data from user
         setProfileData({
