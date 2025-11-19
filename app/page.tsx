@@ -805,6 +805,7 @@ export default function Home() {
   // Handle navigate to dashboard from certificate
   const handleNavigateToDashboard = () => {
     setShowCertificate(false);
+    setCertificateData(null); // Clear certificate data
     if (!isLoggedIn) {
       handleLogin();
     } else {
@@ -2814,7 +2815,10 @@ export default function Home() {
       {certificateData && (
         <CertificateModal
           show={showCertificate}
-          onClose={() => setShowCertificate(false)}
+          onClose={() => {
+            setShowCertificate(false);
+            setCertificateData(null);
+          }}
           data={certificateData}
           onNavigateToDashboard={handleNavigateToDashboard}
         />
