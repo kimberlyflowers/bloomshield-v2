@@ -319,6 +319,7 @@ export default function Home() {
       const { data: dbData, error: dbError} = await supabase
         .from('protected_files')
         .insert({
+          user_id: currentUser?.id,
           file_name: fileToUpload.name,
           file_size: fileToUpload.size,
           mime_type: fileToUpload.type,
