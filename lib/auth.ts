@@ -181,9 +181,19 @@ export async function login({ email, password }: LoginData): Promise<{ success: 
       };
     }
 
-    const userName = authData.user.user_metadata?.name || authData.user.email.split('@')[0] || 'User';
-    const userId = authData.user.id || '';
-    const walletAddress = '0x' + (userId.replace(/-/g, '') + '0000000000000000000000000000000000000000').substring(0, 40);
+    const userName = authData.user.user_metadata?.name || authData.user.email?.split('@')[0] || 'User';
+    const userId = authData.user.id;
+
+    // Safely create wallet address with proper validation
+    let walletAddress = '0x0000000000000000000000000000000000000000';
+    try {
+      if (userId && typeof userId === 'string') {
+        const cleanId = userId.replace(/-/g, '');
+        walletAddress = '0x' + (cleanId + '0000000000000000000000000000000000000000').substring(0, 40);
+      }
+    } catch (err) {
+      console.error('Error generating wallet address:', err);
+    }
 
     const userProfile: UserProfile = {
       id: authData.user.id,
