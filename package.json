@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@polar-sh/sdk": "^0.41.5",
     "@supabase/supabase-js": "^2.38.0",
     "@thirdweb-dev/sdk": "^4.0.45",
     "crypto-js": "^4.1.1",

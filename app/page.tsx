@@ -116,10 +116,7 @@ export default function Home() {
         try {
           const files = JSON.parse(savedFiles);
           setProtectedFiles(files);
-
-          // Load marketplace listings (filter files marked as listed)
-          const listedAssets = files.filter((file: any) => file.isListed);
-          setMarketplaceAssets(listedAssets);
+          // Marketplace listings are now loaded from database via API
         } catch (error) {
           console.error('Error loading protected files:', error);
         }
@@ -184,6 +181,13 @@ export default function Home() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Load marketplace listings when user navigates to marketplace
+  useEffect(() => {
+    if (currentPage === 'marketplace') {
+      loadMarketplaceListings();
+    }
+  }, [currentPage]);
 
   // PRESERVED: Supabase client initialization
   const getSupabaseClient = () => {
@@ -550,56 +554,108 @@ export default function Home() {
   };
 
   // List asset on marketplace
-  const handleConfirmListing = (listingData: any) => {
+  const handleConfirmListing = async (listingData: any) => {
     if (!assetToList) return;
 
-    // Update the asset with listing information
-    const updatedAsset = {
-      ...assetToList,
-      isListed: true,
-      salePrice: listingData.salePrice,
-      allowLease: listingData.allowLease,
-      leasePrice1Month: listingData.leasePrice1Month,
-      leasePrice6Month: listingData.leasePrice6Month,
-      leasePrice1Year: listingData.leasePrice1Year,
-      commercialUse: listingData.commercialUse,
-      attribution: listingData.attribution,
-      resale: listingData.resale || false,
-      listedDate: new Date().toISOString()
-    };
+    try {
+      // Call API to list asset in database
+      const response = await fetch('/api/marketplace/list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          floralId: assetToList.assetId,
+          fileName: assetToList.fileName,
+          fileType: assetToList.fileType,
+          fileSize: assetToList.fileSize,
+          creatorName: assetToList.creator || currentUser?.name || 'Unknown',
+          creatorWallet: assetToList.creatorWallet || userWallet?.address || '0x0000000000000000000000000000000000000000',
+          legalHash: assetToList.legalHash,
+          ipfsHash: assetToList.ipfsHash,
+          blockchainTx: assetToList.blockchainTx,
+          blockNumber: assetToList.blockNumber,
+          salePrice: listingData.salePrice,
+          allowLease: listingData.allowLease,
+          leasePrice1Month: listingData.leasePrice1Month,
+          leasePrice6Month: listingData.leasePrice6Month,
+          leasePrice1Year: listingData.leasePrice1Year,
+          commercialUse: listingData.commercialUse,
+          attribution: listingData.attribution,
+          description: listingData.description || null
+        })
+      });
 
-    // Update protected files
-    const updatedFiles = protectedFiles.map(file =>
-      file.assetId === assetToList.assetId ? updatedAsset : file
-    );
+      const result = await response.json();
 
-    setProtectedFiles(updatedFiles);
-    localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to list asset');
+      }
 
-    // Update marketplace assets
-    const listedAssets = updatedFiles.filter(file => file.isListed);
-    setMarketplaceAssets(listedAssets);
+      // Update the asset with listing information locally
+      const updatedAsset = {
+        ...assetToList,
+        isListed: true,
+        salePrice: listingData.salePrice,
+        allowLease: listingData.allowLease,
+        leasePrice1Month: listingData.leasePrice1Month,
+        leasePrice6Month: listingData.leasePrice6Month,
+        leasePrice1Year: listingData.leasePrice1Year,
+        commercialUse: listingData.commercialUse,
+        attribution: listingData.attribution,
+        resale: listingData.resale || false,
+        listedDate: new Date().toISOString()
+      };
 
-    setShowListingModal(false);
-    setAssetToList(null);
+      // Update protected files
+      const updatedFiles = protectedFiles.map(file =>
+        file.assetId === assetToList.assetId ? updatedAsset : file
+      );
 
-    showToastMessage('✅ Asset listed on marketplace!', 'success');
+      setProtectedFiles(updatedFiles);
+      localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
+
+      // Refresh marketplace listings from database
+      await loadMarketplaceListings();
+
+      setShowListingModal(false);
+      setAssetToList(null);
+
+      showToastMessage('✅ Asset listed on marketplace!', 'success');
+    } catch (error) {
+      console.error('Error listing asset:', error);
+      showToastMessage(`❌ Failed to list asset: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
   };
 
   // Unlist asset from marketplace
-  const handleUnlistAsset = (assetId: string) => {
-    const updatedFiles = protectedFiles.map(file =>
-      file.assetId === assetId ? { ...file, isListed: false, salePrice: 0 } : file
-    );
+  const handleUnlistAsset = async (assetId: string) => {
+    try {
+      // Call API to unlist asset in database
+      const response = await fetch(`/api/marketplace/list?floralId=${encodeURIComponent(assetId)}`, {
+        method: 'DELETE'
+      });
 
-    setProtectedFiles(updatedFiles);
-    localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
+      const result = await response.json();
 
-    // Update marketplace assets
-    const listedAssets = updatedFiles.filter(file => file.isListed);
-    setMarketplaceAssets(listedAssets);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to unlist asset');
+      }
 
-    showToastMessage('✅ Asset removed from marketplace', 'success');
+      // Update local state
+      const updatedFiles = protectedFiles.map(file =>
+        file.assetId === assetId ? { ...file, isListed: false, salePrice: 0 } : file
+      );
+
+      setProtectedFiles(updatedFiles);
+      localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
+
+      // Refresh marketplace listings from database
+      await loadMarketplaceListings();
+
+      showToastMessage('✅ Asset removed from marketplace', 'success');
+    } catch (error) {
+      console.error('Error unlisting asset:', error);
+      showToastMessage(`❌ Failed to unlist asset: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
   };
 
   // View asset details
@@ -609,7 +665,7 @@ export default function Home() {
   };
 
   // Purchase asset
-  const handlePurchaseAsset = () => {
+  const handlePurchaseAsset = async () => {
     if (!selectedAsset || !currentUser) {
       showToastMessage('⚠️ Please log in to purchase', 'warning');
       return;
@@ -621,48 +677,81 @@ export default function Home() {
     }
 
     const confirmed = confirm(
-      `Purchase ${selectedAsset.fileName} for $${selectedAsset.salePrice}?\n\nThis will transfer ownership to you.`
+      `Purchase ${selectedAsset.fileName} for $${selectedAsset.salePrice}?\n\nThis will redirect you to checkout.`
     );
 
     if (!confirmed) return;
 
-    // Simulate purchase (in production, this would call blockchain + Stripe)
-    const purchaseTx = '0x' + Array.from({ length: 64 }, () =>
-      '0123456789abcdef'[Math.floor(Math.random() * 16)]
-    ).join('');
+    try {
+      // Call Polar checkout API
+      const response = await fetch('/api/polar/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assetId: selectedAsset.assetId,
+          assetName: selectedAsset.fileName,
+          assetType: 'sale',
+          amount: selectedAsset.salePrice,
+          sellerId: selectedAsset.creatorUid || selectedAsset.creator,
+          sellerWallet: selectedAsset.creatorWallet
+        })
+      });
 
-    // Update asset ownership
-    const updatedFiles = protectedFiles.map(file => {
-      if (file.assetId === selectedAsset.assetId) {
-        return {
-          ...file,
-          creator: currentUser.name,
-          creatorWallet: userWallet?.address,
-          isListed: false,
-          previousOwner: file.creator,
-          purchaseDate: new Date().toISOString(),
-          purchasePrice: file.salePrice,
-          purchaseTx: purchaseTx
-        };
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create checkout');
       }
-      return file;
-    });
 
-    setProtectedFiles(updatedFiles);
-    localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
+      // Redirect to checkout URL
+      if (result.checkoutUrl) {
+        if (result.simulated) {
+          // For simulated checkout, handle locally
+          showToastMessage('⚠️ Using simulated payment (Polar not configured)', 'warning');
 
-    // Update marketplace
-    const listedAssets = updatedFiles.filter(file => file.isListed);
-    setMarketplaceAssets(listedAssets);
+          // Simulate purchase locally
+          const purchaseTx = '0x' + Array.from({ length: 64 }, () =>
+            '0123456789abcdef'[Math.floor(Math.random() * 16)]
+          ).join('');
 
-    setShowAssetDetail(false);
-    setSelectedAsset(null);
+          const updatedFiles = protectedFiles.map(file => {
+            if (file.assetId === selectedAsset.assetId) {
+              return {
+                ...file,
+                creator: currentUser.name,
+                creatorWallet: userWallet?.address,
+                isListed: false,
+                previousOwner: file.creator,
+                purchaseDate: new Date().toISOString(),
+                purchasePrice: file.salePrice,
+                purchaseTx: purchaseTx
+              };
+            }
+            return file;
+          });
 
-    showToastMessage('✅ Purchase successful! Asset is now yours.', 'success');
+          setProtectedFiles(updatedFiles);
+          localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
+
+          await loadMarketplaceListings();
+
+          setShowAssetDetail(false);
+          setSelectedAsset(null);
+
+          showToastMessage('✅ Purchase successful! (Simulated)', 'success');
+        } else {
+          // Redirect to real Polar checkout
+          window.location.href = result.checkoutUrl;
+        }
+      }
+    } catch (error) {
+      console.error('Error creating checkout:', error);
+      showToastMessage(`❌ Purchase failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
   };
 
   // Lease asset
-  const handleLeaseAsset = (duration: string, price: number) => {
+  const handleLeaseAsset = async (duration: string, price: number) => {
     if (!selectedAsset || !currentUser) {
       showToastMessage('⚠️ Please log in to lease', 'warning');
       return;
@@ -674,115 +763,136 @@ export default function Home() {
     }
 
     const confirmed = confirm(
-      `Lease ${selectedAsset.fileName} for ${duration} at $${price}?`
+      `Lease ${selectedAsset.fileName} for ${duration} at $${price}?\n\nThis will redirect you to checkout.`
     );
 
     if (!confirmed) return;
 
-    // Simulate lease transaction
-    const leaseTx = '0x' + Array.from({ length: 64 }, () =>
-      '0123456789abcdef'[Math.floor(Math.random() * 16)]
-    ).join('');
+    try {
+      // Call Polar checkout API for lease
+      const response = await fetch('/api/polar/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assetId: selectedAsset.assetId,
+          assetName: selectedAsset.fileName,
+          assetType: 'lease',
+          amount: price,
+          sellerId: selectedAsset.creatorUid || selectedAsset.creator,
+          sellerWallet: selectedAsset.creatorWallet,
+          leaseDuration: duration
+        })
+      });
 
-    // Calculate end date
-    const durationDays = duration === '1 Month' ? 30 : duration === '6 Months' ? 180 : 365;
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + durationDays);
+      const result = await response.json();
 
-    // Store lease in localStorage
-    const leases = JSON.parse(localStorage.getItem('leases') || '[]');
-    leases.push({
-      assetId: selectedAsset.assetId,
-      assetName: selectedAsset.fileName,
-      lessee: currentUser.name,
-      lesseeWallet: userWallet?.address,
-      owner: selectedAsset.creator,
-      ownerWallet: selectedAsset.creatorWallet,
-      startDate: new Date().toISOString(),
-      endDate: endDate.toISOString(),
-      duration: duration,
-      price: price,
-      leaseTx: leaseTx,
-      active: true
-    });
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create checkout');
+      }
 
-    localStorage.setItem('leases', JSON.stringify(leases));
+      // Redirect to checkout URL
+      if (result.checkoutUrl) {
+        if (result.simulated) {
+          // For simulated checkout, handle locally
+          showToastMessage('⚠️ Using simulated payment (Polar not configured)', 'warning');
 
-    setShowAssetDetail(false);
-    setSelectedAsset(null);
+          // Simulate lease locally
+          const leaseTx = '0x' + Array.from({ length: 64 }, () =>
+            '0123456789abcdef'[Math.floor(Math.random() * 16)]
+          ).join('');
 
-    showToastMessage('✅ Lease created successfully!', 'success');
+          const durationDays = duration === '1 Month' ? 30 : duration === '6 Months' ? 180 : 365;
+          const endDate = new Date();
+          endDate.setDate(endDate.getDate() + durationDays);
+
+          const leases = JSON.parse(localStorage.getItem('leases') || '[]');
+          leases.push({
+            assetId: selectedAsset.assetId,
+            assetName: selectedAsset.fileName,
+            lessee: currentUser.name,
+            lesseeWallet: userWallet?.address,
+            owner: selectedAsset.creator,
+            ownerWallet: selectedAsset.creatorWallet,
+            startDate: new Date().toISOString(),
+            endDate: endDate.toISOString(),
+            duration: duration,
+            price: price,
+            leaseTx: leaseTx,
+            active: true
+          });
+
+          localStorage.setItem('leases', JSON.stringify(leases));
+
+          setShowAssetDetail(false);
+          setSelectedAsset(null);
+
+          showToastMessage('✅ Lease created successfully! (Simulated)', 'success');
+        } else {
+          // Redirect to real Polar checkout
+          window.location.href = result.checkoutUrl;
+        }
+      }
+    } catch (error) {
+      console.error('Error creating lease checkout:', error);
+      showToastMessage(`❌ Lease failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
+  };
+
+  // Load marketplace listings from database
+  const loadMarketplaceListings = async () => {
+    try {
+      const params = new URLSearchParams();
+
+      if (marketplaceSearchQuery) {
+        params.append('search', marketplaceSearchQuery);
+      }
+
+      if (marketplaceFilters.type !== 'all') {
+        params.append('assetType', marketplaceFilters.type);
+      }
+
+      if (marketplaceFilters.license !== 'all') {
+        params.append('licenseType', marketplaceFilters.license);
+      }
+
+      // Parse price filter (e.g., "0-100", "100-500", "1000+")
+      if (marketplaceFilters.price !== 'all') {
+        const priceRange = marketplaceFilters.price;
+        if (priceRange.includes('+')) {
+          const minPrice = parseInt(priceRange.replace('+', ''));
+          params.append('minPrice', minPrice.toString());
+        } else if (priceRange.includes('-')) {
+          const [min, max] = priceRange.split('-').map(Number);
+          if (min) params.append('minPrice', min.toString());
+          if (max) params.append('maxPrice', max.toString());
+        }
+      }
+
+      params.append('sortBy', marketplaceFilters.sort);
+
+      const response = await fetch(`/api/marketplace/listings?${params.toString()}`);
+      const result = await response.json();
+
+      if (result.success) {
+        setMarketplaceAssets(result.listings || []);
+      } else {
+        throw new Error(result.error || 'Failed to load listings');
+      }
+    } catch (error) {
+      console.error('Error loading marketplace listings:', error);
+      showToastMessage(`❌ Failed to load marketplace: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
   };
 
   // Search marketplace
   const handleMarketplaceSearch = () => {
-    if (!marketplaceSearchQuery.trim()) {
-      // Reload all listings if search is empty
-      const listedAssets = protectedFiles.filter(file => file.isListed);
-      setMarketplaceAssets(listedAssets);
-      return;
-    }
-
-    const query = marketplaceSearchQuery.toLowerCase();
-    const results = protectedFiles.filter(file => {
-      if (!file.isListed) return false;
-
-      return (
-        file.fileName?.toLowerCase().includes(query) ||
-        file.creator?.toLowerCase().includes(query) ||
-        file.assetId?.toLowerCase().includes(query) ||
-        file.fileType?.toLowerCase().includes(query)
-      );
-    });
-
-    setMarketplaceAssets(results);
-
-    if (results.length === 0) {
-      showToastMessage(`No results found for "${marketplaceSearchQuery}"`, 'warning');
-    }
+    loadMarketplaceListings();
   };
 
   // Apply marketplace filters
   const handleApplyFilters = () => {
-    let filtered = protectedFiles.filter(file => file.isListed);
-
-    // Filter by type
-    if (marketplaceFilters.type !== 'all') {
-      filtered = filtered.filter(file =>
-        file.fileType?.toLowerCase().includes(marketplaceFilters.type)
-      );
-    }
-
-    // Filter by license
-    if (marketplaceFilters.license === 'sale') {
-      filtered = filtered.filter(file => file.salePrice > 0);
-    } else if (marketplaceFilters.license === 'lease') {
-      filtered = filtered.filter(file => file.allowLease);
-    }
-
-    // Filter by price
-    if (marketplaceFilters.price !== 'all') {
-      const [min, max] = marketplaceFilters.price.includes('+')
-        ? [1000, Infinity]
-        : marketplaceFilters.price.split('-').map(Number);
-
-      filtered = filtered.filter(file => {
-        const price = file.salePrice || 0;
-        return price >= min && price <= (max || Infinity);
-      });
-    }
-
-    // Sort
-    if (marketplaceFilters.sort === 'newest') {
-      filtered.sort((a, b) => new Date(b.protectedDate || 0).getTime() - new Date(a.protectedDate || 0).getTime());
-    } else if (marketplaceFilters.sort === 'price-low') {
-      filtered.sort((a, b) => (a.salePrice || 0) - (b.salePrice || 0));
-    } else if (marketplaceFilters.sort === 'price-high') {
-      filtered.sort((a, b) => (b.salePrice || 0) - (a.salePrice || 0));
-    }
-
-    setMarketplaceAssets(filtered);
-    showToastMessage(`Found ${filtered.length} assets`, 'success');
+    // Filters are now handled by the API in loadMarketplaceListings
+    loadMarketplaceListings();
   };
 
   // Handle navigation
