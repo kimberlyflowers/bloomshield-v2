@@ -173,6 +173,9 @@ export default function Home() {
 
         // Load 2FA status from user profile
         setTwoFactorEnabled(user.twoFactorEnabled);
+
+        // Load user's protected files from database
+        loadProtectedFilesFromDB();
       } else {
         setUserWallet(null);
         setAuthLoading(false);
@@ -320,9 +323,17 @@ export default function Home() {
 
       // Step 4: Save to Database
       setUploadStatus('Saving protection record...');
+
+      // Get current user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       const { data: dbData, error: dbError} = await supabase
         .from('protected_files')
         .insert({
+          user_id: user.id,
           file_name: fileToUpload.name,
           file_size: fileToUpload.size,
           mime_type: fileToUpload.type,
@@ -373,18 +384,8 @@ export default function Home() {
       };
       setCertificateData(certData);
 
-      // Save to localStorage for My Files section
-      if (typeof window !== 'undefined') {
-        try {
-          const savedFiles = localStorage.getItem('protectedFiles');
-          const filesArray = savedFiles ? JSON.parse(savedFiles) : [];
-          filesArray.unshift(certData); // Add new file to the beginning
-          localStorage.setItem('protectedFiles', JSON.stringify(filesArray));
-          setProtectedFiles(filesArray); // Update state
-        } catch (error) {
-          console.error('Error saving to localStorage:', error);
-        }
-      }
+      // Reload protected files from database
+      await loadProtectedFilesFromDB();
 
       const successMessage = blockchainTransactionHash.startsWith('0xSIM')
         ? '✅ File protected successfully! ⚠️ Using simulated blockchain.'
@@ -835,6 +836,36 @@ export default function Home() {
     } catch (error) {
       console.error('Error creating lease checkout:', error);
       showToastMessage(`❌ Lease failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
+  };
+
+  // Load user's protected files from database
+  const loadProtectedFilesFromDB = async () => {
+    try {
+      const response = await fetch('/api/files/protected');
+      const result = await response.json();
+
+      if (result.success) {
+        setProtectedFiles(result.files || []);
+        // Also update localStorage for backward compatibility
+        localStorage.setItem('protectedFiles', JSON.stringify(result.files || []));
+        console.log(`✅ Loaded ${result.count} protected files from database`);
+      } else {
+        throw new Error(result.error || 'Failed to load protected files');
+      }
+    } catch (error) {
+      console.error('Error loading protected files:', error);
+      // Fallback to localStorage if API fails
+      const savedFiles = localStorage.getItem('protectedFiles');
+      if (savedFiles) {
+        try {
+          const files = JSON.parse(savedFiles);
+          setProtectedFiles(files);
+          console.log('⚠️ Loaded files from localStorage (API failed)');
+        } catch (e) {
+          console.error('Error parsing localStorage files:', e);
+        }
+      }
     }
   };
 
