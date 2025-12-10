@@ -138,7 +138,7 @@ export default function Home() {
 
   // Auth state listener
   useEffect(() => {
-    const { data: { subscription } } = onAuthStateChange((user) => {
+    const subscription = onAuthStateChange((user) => {
       setCurrentUser(user);
       setIsLoggedIn(!!user);
       setAuthLoading(false);
@@ -946,6 +946,7 @@ export default function Home() {
   // Handle navigate to dashboard from certificate
   const handleNavigateToDashboard = () => {
     setShowCertificate(false);
+    setCertificateData(null); // Clear data to prevent reopening
     if (!isLoggedIn) {
       handleLogin();
     } else {
@@ -2955,7 +2956,10 @@ export default function Home() {
       {certificateData && (
         <CertificateModal
           show={showCertificate}
-          onClose={() => setShowCertificate(false)}
+          onClose={() => {
+            setShowCertificate(false);
+            setCertificateData(null); // Clear data to prevent reopening
+          }}
           data={certificateData}
           onNavigateToDashboard={handleNavigateToDashboard}
         />
