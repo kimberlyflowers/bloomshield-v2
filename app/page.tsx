@@ -8,6 +8,7 @@ import CertificateModal from '@/components/CertificateModal';
 import ProcessingOverlay from '@/components/ProcessingOverlay';
 import AuthModal from '@/components/AuthModal';
 import { onAuthStateChange, logout, generateUserWallet } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 import { UserProfile } from '@/types/user';
 
 export default function Home() {
@@ -192,30 +193,6 @@ export default function Home() {
     }
   }, [currentPage]);
 
-  // PRESERVED: Supabase client initialization
-  const getSupabaseClient = () => {
-    if (typeof window === 'undefined') return null;
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('Supabase environment variables not set');
-      return null;
-    }
-
-    try {
-      if (typeof window !== 'undefined') {
-        const { createClient } = require('@supabase/supabase-js');
-        return createClient(supabaseUrl, supabaseKey);
-      }
-      return null;
-    } catch (error) {
-      console.error('Failed to create Supabase client:', error);
-      return null;
-    }
-  };
-
   // PRESERVED: Hash generation function
   const generateHashes = async (file: File) => {
     try {
@@ -249,9 +226,9 @@ export default function Home() {
     if (!fileToUpload) return;
 
     try {
-      const supabase = getSupabaseClient();
+      // Use singleton Supabase client (imported at top)
       if (!supabase) {
-        throw new Error('Failed to initialize Supabase client');
+        throw new Error('Supabase client not initialized');
       }
 
       // Show processing overlay
@@ -841,6 +818,12 @@ export default function Home() {
 
   // Load user's protected files from database
   const loadProtectedFilesFromDB = async () => {
+    // Guard: Only fetch if user is logged in
+    if (!isLoggedIn || !currentUser) {
+      console.log('⚠️ Skipping file fetch - user not authenticated');
+      return;
+    }
+
     try {
       const response = await fetch('/api/files/protected');
       const result = await response.json();
