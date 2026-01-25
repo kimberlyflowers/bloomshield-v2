@@ -126,18 +126,35 @@ async function handleSuccessfulPayment(supabase: any, event: any) {
       const endDate = new Date();
       endDate.setDate(endDate.getDate() + durationDays);
 
+      // Fetch buyer and seller info for required fields
+      const { data: buyerData } = await supabase
+        .from('users')
+        .select('name, wallet_address')
+        .eq('id', buyerId)
+        .single();
+
+      const { data: sellerData } = await supabase
+        .from('users')
+        .select('wallet_address')
+        .eq('id', sellerId)
+        .single();
+
       const { error: leaseError } = await supabase
         .from('leases')
         .insert({
-          asset_id: assetId,
+          floral_id: assetId,  // Changed from asset_id
+          asset_name: assetName || 'Unknown Asset',
+          lessee_wallet: buyerData?.wallet_address || '0x0000000000000000000000000000000000000000',
           lessee_uid: buyerId,
-          lessor_uid: sellerId,
+          lessee_name: buyerData?.name || buyerEmail || 'Unknown',
+          owner_wallet: sellerData?.wallet_address || sellerWallet || '0x0000000000000000000000000000000000000000',
+          owner_uid: sellerId,  // Changed from lessor_uid
           start_date: new Date().toISOString(),
           end_date: endDate.toISOString(),
-          duration: leaseDuration,
-          amount: checkout?.amount || 0,
-          status: 'active',
-          created_at: new Date().toISOString()
+          duration_days: durationDays,  // Changed from duration (string) to duration_days (integer)
+          price: checkout?.amount || 0,
+          blockchain_tx: event.transactionHash || `sim_${Date.now()}`,
+          active: true
         });
 
       if (leaseError) {
