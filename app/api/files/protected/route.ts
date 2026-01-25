@@ -17,6 +17,9 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`✅ Fetching protected files for user: ${user.id} (${user.email})`);
+    console.log(`🔍 Expected user_id in database: 823e2fb5-2f8f-4279-9c84-c8f4bf78bcce`);
+    console.log(`🔍 Current logged-in user_id: ${user.id}`);
+    console.log(`🔍 User IDs match: ${user.id === '823e2fb5-2f8f-4279-9c84-c8f4bf78bcce' ? 'YES ✅' : 'NO ❌'}`);
 
     // Fetch user's protected files from database
     const { data: files, error: filesError } = await supabase
@@ -26,6 +29,10 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     console.log(`📊 Query result: ${files?.length || 0} files found for user ${user.id}`);
+
+    if (files && files.length > 0) {
+      console.log(`📄 Sample file user_ids:`, files.slice(0, 3).map(f => f.user_id));
+    }
 
     if (filesError) {
       console.error('Error fetching protected files:', filesError);

@@ -1,5 +1,5 @@
 import { authClient } from './better-auth-client';
-import { createClient } from './supabase';
+import { supabase } from './supabase';
 import { SignUpData, LoginData, UserProfile, AuthError } from '@/types/user';
 
 // Check if Better Auth is configured
@@ -23,7 +23,9 @@ export function generateUserWallet() {
 
 // Supabase Auth fallback functions
 async function signUpWithSupabase({ email, password, name }: SignUpData) {
-  const supabase = createClient();
+  if (!supabase) {
+    return { success: false, error: { message: 'Supabase client not initialized' } };
+  }
 
   // Generate wallet for new user
   const wallet = generateUserWallet();
@@ -64,7 +66,9 @@ async function signUpWithSupabase({ email, password, name }: SignUpData) {
 }
 
 async function loginWithSupabase({ email, password }: LoginData) {
-  const supabase = createClient();
+  if (!supabase) {
+    return { success: false, error: { message: 'Supabase client not initialized' } };
+  }
 
   const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
     email,
@@ -73,6 +77,8 @@ async function loginWithSupabase({ email, password }: LoginData) {
 
   if (authError) return { success: false, error: { message: authError.message } };
   if (!authData.user) return { success: false, error: { message: 'Login failed' } };
+
+  console.log(`✅ Supabase Auth: Logged in as ${authData.user.email} (ID: ${authData.user.id})`);
 
   // Get user profile
   const { data: profile, error: profileError } = await supabase
@@ -142,7 +148,7 @@ async function loginWithSupabase({ email, password }: LoginData) {
 }
 
 async function getCurrentUserProfileSupabase(): Promise<UserProfile | null> {
-  const supabase = createClient();
+  if (!supabase) return null;
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return null;
@@ -170,7 +176,9 @@ async function getCurrentUserProfileSupabase(): Promise<UserProfile | null> {
 }
 
 async function logoutSupabase() {
-  const supabase = createClient();
+  if (!supabase) {
+    return { success: false, error: { message: 'Supabase client not initialized' } };
+  }
   const { error } = await supabase.auth.signOut();
   if (error) return { success: false, error: { message: error.message } };
   return { success: true };
@@ -326,14 +334,17 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
 }
 
 export function onAuthStateChange(callback: (user: UserProfile | null) => void) {
-  // Use Supabase's real-time auth state changes
-  const supabase = createClient();
+  // Use Supabase's real-time auth state changes (singleton client)
+  if (!supabase) {
+    callback(null);
+    return { unsubscribe: () => {} };
+  }
 
   // Initial load
   getCurrentUserProfile().then(callback);
 
   // Subscribe to auth changes
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, _session) => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: any, _session: any) => {
     const user = await getCurrentUserProfile();
     callback(user);
   });
@@ -343,7 +354,9 @@ export function onAuthStateChange(callback: (user: UserProfile | null) => void) 
 
 export async function resetPassword(email: string): Promise<{ success: boolean; error?: AuthError }> {
   try {
-    const supabase = createClient();
+    if (!supabase) {
+      return { success: false, error: { message: 'Supabase client not initialized' } };
+    }
     const { error } = await supabase.auth.resetPasswordForEmail(email);
     if (error) return { success: false, error: { message: error.message } };
     return { success: true };
@@ -354,7 +367,9 @@ export async function resetPassword(email: string): Promise<{ success: boolean; 
 
 export async function updatePassword(newPassword: string): Promise<{ success: boolean; error?: AuthError }> {
   try {
-    const supabase = createClient();
+    if (!supabase) {
+      return { success: false, error: { message: 'Supabase client not initialized' } };
+    }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return { success: false, error: { message: error.message } };
     return { success: true };
@@ -365,7 +380,7 @@ export async function updatePassword(newPassword: string): Promise<{ success: bo
 
 export async function getSession() {
   try {
-    const supabase = createClient();
+    if (!supabase) return null;
     const { data: { session } } = await supabase.auth.getSession();
     return session;
   } catch (error) {
