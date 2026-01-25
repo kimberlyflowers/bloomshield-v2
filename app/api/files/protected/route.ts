@@ -22,16 +22,30 @@ export async function GET(request: NextRequest) {
     console.log(`🔍 User IDs match: ${user.id === '823e2fb5-2f8f-4279-9c84-c8f4bf78bcce' ? 'YES ✅' : 'NO ❌'}`);
 
     // Fetch user's protected files from database
+    console.log(`🔍 Querying protected_files table with user_id: ${user.id}`);
     const { data: files, error: filesError } = await supabase
       .from('protected_files')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
-    console.log(`📊 Query result: ${files?.length || 0} files found for user ${user.id}`);
+    console.log(`📊 Query completed`);
+    console.log(`  - filesError:`, filesError);
+    console.log(`  - files type:`, typeof files);
+    console.log(`  - files is array:`, Array.isArray(files));
+    console.log(`  - files length:`, files?.length || 0);
 
     if (files && files.length > 0) {
-      console.log(`📄 Sample file user_ids:`, files.slice(0, 3).map(f => f.user_id));
+      console.log(`📄 Sample files (first 3):`);
+      files.slice(0, 3).forEach((f, idx) => {
+        console.log(`  [${idx}] user_id: ${f.user_id}, file_name: ${f.file_name}`);
+      });
+    } else {
+      console.log(`⚠️ NO FILES FOUND for user_id: ${user.id}`);
+      console.log(`  Possible reasons:`);
+      console.log(`  1. No records with matching user_id in database`);
+      console.log(`  2. RLS policies blocking access`);
+      console.log(`  3. user_id column mismatch`);
     }
 
     if (filesError) {
@@ -63,11 +77,18 @@ export async function GET(request: NextRequest) {
       isListed: false // Will be checked against assets table
     }));
 
-    return NextResponse.json({
+    const responseData = {
       success: true,
       files: transformedFiles,
       count: transformedFiles.length
-    });
+    };
+
+    console.log(`📤 Returning response to client:`);
+    console.log(`  success: ${responseData.success}`);
+    console.log(`  count: ${responseData.count}`);
+    console.log(`  files.length: ${responseData.files.length}`);
+
+    return NextResponse.json(responseData);
 
   } catch (error: any) {
     console.error('Get protected files error:', error);

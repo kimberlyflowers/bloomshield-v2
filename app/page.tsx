@@ -176,6 +176,7 @@ export default function Home() {
         setTwoFactorEnabled(user.twoFactorEnabled);
 
         // Load user's protected files from database
+        console.log('🔄 [Auth Change] User authenticated, loading protected files...');
         loadProtectedFilesFromDB();
       } else {
         setUserWallet(null);
@@ -362,6 +363,7 @@ export default function Home() {
       setCertificateData(certData);
 
       // Reload protected files from database
+      console.log('🔄 [File Upload] File uploaded, reloading protected files...');
       await loadProtectedFilesFromDB();
 
       const successMessage = blockchainTransactionHash.startsWith('0xSIM')
@@ -821,33 +823,49 @@ export default function Home() {
     // Guard: Only fetch if user is logged in
     if (!isLoggedIn || !currentUser) {
       console.log('⚠️ Skipping file fetch - user not authenticated');
+      console.log('  isLoggedIn:', isLoggedIn);
+      console.log('  currentUser:', currentUser);
       return;
     }
 
+    console.log('🔄 Fetching protected files from database...');
+    console.log('  User:', currentUser?.email || 'Unknown');
+
     try {
       const response = await fetch('/api/files/protected');
+      console.log('📡 API Response status:', response.status, response.statusText);
+
       const result = await response.json();
+      console.log('📦 API Response data:', result);
+      console.log('  success:', result.success);
+      console.log('  count:', result.count);
+      console.log('  files array length:', result.files?.length);
 
       if (result.success) {
-        setProtectedFiles(result.files || []);
+        const filesArray = result.files || [];
+        console.log(`✅ Setting ${filesArray.length} files to state`);
+        setProtectedFiles(filesArray);
         // Also update localStorage for backward compatibility
-        localStorage.setItem('protectedFiles', JSON.stringify(result.files || []));
-        console.log(`✅ Loaded ${result.count} protected files from database`);
+        localStorage.setItem('protectedFiles', JSON.stringify(filesArray));
+        console.log(`✅ SUCCESS: Loaded ${result.count} protected files from database`);
       } else {
+        console.error('❌ API returned success: false');
         throw new Error(result.error || 'Failed to load protected files');
       }
     } catch (error) {
-      console.error('Error loading protected files:', error);
+      console.error('❌ Error loading protected files:', error);
       // Fallback to localStorage if API fails
       const savedFiles = localStorage.getItem('protectedFiles');
       if (savedFiles) {
         try {
           const files = JSON.parse(savedFiles);
+          console.log(`⚠️ Fallback: Loading ${files.length} files from localStorage`);
           setProtectedFiles(files);
-          console.log('⚠️ Loaded files from localStorage (API failed)');
         } catch (e) {
           console.error('Error parsing localStorage files:', e);
         }
+      } else {
+        console.log('⚠️ No localStorage fallback available');
       }
     }
   };
