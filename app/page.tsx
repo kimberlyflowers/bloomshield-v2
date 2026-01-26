@@ -53,6 +53,11 @@ export default function Home() {
   // Dashboard submenu state
   const [dashboardSection, setDashboardSection] = useState('overview');
 
+  // Sentinel AI monitoring state
+  const [sentinelData, setSentinelData] = useState<any>(null);
+  const [sentinelLoading, setSentinelLoading] = useState(false);
+  const [lastScanTime, setLastScanTime] = useState<string | null>(null);
+
   // Wallet submenu state
   const [walletSection, setWalletSection] = useState('overview');
 
@@ -193,6 +198,40 @@ export default function Home() {
       loadMarketplaceListings();
     }
   }, [currentPage]);
+
+  // Sentinel AI monitoring - fetch scan data when monitoring tab is active
+  useEffect(() => {
+    const fetchSentinelData = async () => {
+      if (currentPage === 'dashboard' && dashboardSection === 'monitoring' && !sentinelLoading) {
+        setSentinelLoading(true);
+        try {
+          const response = await fetch('/api/sentinel/scan');
+          const data = await response.json();
+
+          if (data.success) {
+            setSentinelData(data);
+            setLastScanTime(new Date().toLocaleTimeString());
+            console.log('🛡️ Sentinel scan data loaded:', data.sources_scanned.toLocaleString(), 'sources');
+          }
+        } catch (error) {
+          console.error('Failed to fetch Sentinel data:', error);
+        } finally {
+          setSentinelLoading(false);
+        }
+      }
+    };
+
+    fetchSentinelData();
+
+    // Auto-refresh every 5 minutes if monitoring tab is active
+    const interval = setInterval(() => {
+      if (currentPage === 'dashboard' && dashboardSection === 'monitoring') {
+        fetchSentinelData();
+      }
+    }, 300000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [currentPage, dashboardSection]);
 
   // PRESERVED: Hash generation function
   // Generate perceptual hash for images (resistant to minor edits)
@@ -1455,21 +1494,151 @@ export default function Home() {
                 </div>
               )}
 
-              {/* MONITORING SECTION */}
+              {/* MONITORING SECTION - SENTINEL AI */}
               {dashboardSection === 'monitoring' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Monitoring</h1>
-
-                  <div className="bg-[#FFB8A3] rounded-2xl p-12 text-center text-white shadow-lg">
-                    <h3 className="text-3xl font-bold mb-4">🔍 Unlock Advanced Monitoring</h3>
-                    <p className="text-xl mb-8 opacity-95">Track your content across the web and get alerts when copies are detected</p>
-                    <button
-                      onClick={handleUpgradeToPro}
-                      className="bg-white text-[#FF8C42] font-bold py-4 px-10 rounded-lg hover:shadow-xl transition-all text-lg"
-                    >
-                      Upgrade to Pro
-                    </button>
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h1 className="text-4xl font-bold text-gray-800">Sentinel AI Monitoring</h1>
+                      <p className="text-gray-500 mt-2">Real-time protection across millions of sources</p>
+                    </div>
+                    {lastScanTime && (
+                      <div className="text-sm text-gray-500 flex items-center gap-2">
+                        <span className="relative flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                        </span>
+                        Last scanned: {lastScanTime}
+                      </div>
+                    )}
                   </div>
+
+                  {sentinelLoading && !sentinelData ? (
+                    <div className="bg-white rounded-2xl p-12 text-center shadow-lg">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#FF8C42]"></div>
+                        <p className="text-gray-600 text-lg">Scanning millions of sources...</p>
+                      </div>
+                    </div>
+                  ) : sentinelData ? (
+                    <div>
+                      {/* Main Stats */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-8 text-white shadow-lg">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-semibold">Sources Monitored</h3>
+                            <span className="text-4xl">🛡️</span>
+                          </div>
+                          <div className="text-5xl font-bold mb-2">
+                            {sentinelLoading ? (
+                              <span className="animate-pulse">...</span>
+                            ) : (
+                              sentinelData.sources_scanned.toLocaleString()
+                            )}
+                          </div>
+                          <p className="text-green-100 text-sm">Continuously scanning</p>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-8 text-white shadow-lg">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-semibold">Data Leaks Found</h3>
+                            <span className="text-4xl">✅</span>
+                          </div>
+                          <div className="text-5xl font-bold mb-2">
+                            {sentinelData.leaks_found.toString().padStart(2, '0')}
+                          </div>
+                          <p className="text-emerald-100 text-sm">You're secure!</p>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-8 text-white shadow-lg">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-semibold">Next Scan</h3>
+                            <span className="text-4xl">⏱️</span>
+                          </div>
+                          <div className="text-5xl font-bold mb-2">
+                            {Math.floor(sentinelData.next_scan_in / 60)}m
+                          </div>
+                          <p className="text-blue-100 text-sm">Auto-refresh enabled</p>
+                        </div>
+                      </div>
+
+                      {/* Coverage Breakdown */}
+                      <div className="bg-white rounded-2xl p-8 shadow-lg mb-8">
+                        <h3 className="text-2xl font-bold text-gray-800 mb-6">Coverage Breakdown</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                          <div className="text-center">
+                            <div className="text-3xl mb-2">📱</div>
+                            <div className="text-2xl font-bold text-gray-800">
+                              {sentinelData.scan_coverage.social_media.toLocaleString()}
+                            </div>
+                            <div className="text-sm text-gray-500 mt-1">Social Media</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-3xl mb-2">🕸️</div>
+                            <div className="text-2xl font-bold text-gray-800">
+                              {sentinelData.scan_coverage.dark_web.toLocaleString()}
+                            </div>
+                            <div className="text-sm text-gray-500 mt-1">Dark Web</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-3xl mb-2">📁</div>
+                            <div className="text-2xl font-bold text-gray-800">
+                              {sentinelData.scan_coverage.file_sharing.toLocaleString()}
+                            </div>
+                            <div className="text-sm text-gray-500 mt-1">File Sharing</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-3xl mb-2">💾</div>
+                            <div className="text-2xl font-bold text-gray-800">
+                              {sentinelData.scan_coverage.public_databases.toLocaleString()}
+                            </div>
+                            <div className="text-sm text-gray-500 mt-1">Public Databases</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Recent Scans */}
+                      <div className="bg-white rounded-2xl p-8 shadow-lg">
+                        <div className="flex items-center justify-between mb-6">
+                          <h3 className="text-2xl font-bold text-gray-800">Recent Scan Activity</h3>
+                          {sentinelLoading && (
+                            <span className="text-sm text-gray-500 flex items-center gap-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#FF8C42]"></div>
+                              Refreshing...
+                            </span>
+                          )}
+                        </div>
+                        <div className="space-y-3">
+                          {sentinelData.recent_scans.map((scan: any, index: number) => (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                            >
+                              <div className="flex items-center gap-4">
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <div>
+                                  <div className="font-semibold text-gray-800">{scan.source}</div>
+                                  <div className="text-sm text-gray-500">
+                                    {scan.scannedItems.toLocaleString()} items scanned
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+                                  {scan.status}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">{scan.timestamp}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-2xl p-12 text-center shadow-lg">
+                      <p className="text-gray-500">Failed to load monitoring data. Please refresh.</p>
+                    </div>
+                  )}
                 </div>
               )}
 
