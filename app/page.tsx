@@ -1539,15 +1539,21 @@ export default function Home() {
                           <p className="text-green-100 text-sm">Continuously scanning</p>
                         </div>
 
-                        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-8 text-white shadow-lg">
+                        <div className={`bg-gradient-to-br rounded-2xl p-8 text-white shadow-lg ${
+                          sentinelData.leaks_found > 0
+                            ? 'from-red-500 to-red-600'
+                            : 'from-emerald-500 to-emerald-600'
+                        }`}>
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="text-xl font-semibold">Data Leaks Found</h3>
-                            <span className="text-4xl">✅</span>
+                            <span className="text-4xl">{sentinelData.leaks_found > 0 ? '⚠️' : '✅'}</span>
                           </div>
                           <div className="text-5xl font-bold mb-2">
                             {sentinelData.leaks_found.toString().padStart(2, '0')}
                           </div>
-                          <p className="text-emerald-100 text-sm">You're secure!</p>
+                          <p className={sentinelData.leaks_found > 0 ? 'text-red-100 text-sm' : 'text-emerald-100 text-sm'}>
+                            {sentinelData.leaks_found > 0 ? 'Action required!' : 'You\'re secure!'}
+                          </p>
                         </div>
 
                         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-8 text-white shadow-lg">
@@ -1597,6 +1603,37 @@ export default function Home() {
                         </div>
                       </div>
 
+                      {/* Breach Alert (if any) */}
+                      {sentinelData.breach_details && (
+                        <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-8 mb-8">
+                          <div className="flex items-start gap-4">
+                            <span className="text-5xl">🚨</span>
+                            <div className="flex-1">
+                              <h3 className="text-2xl font-bold text-red-800 mb-2">Data Breach Detected</h3>
+                              <p className="text-red-700 mb-4">
+                                Your email <strong>{sentinelData.breach_details.email}</strong> was found in{' '}
+                                <strong>{sentinelData.breach_details.breach_count}</strong> data breach{sentinelData.breach_details.breach_count > 1 ? 'es' : ''}.
+                              </p>
+                              <div className="bg-white rounded-lg p-4">
+                                <p className="font-semibold text-gray-800 mb-2">Affected Services:</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {sentinelData.breach_details.breaches.map((breach: string, i: number) => (
+                                    <span key={i} className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-semibold">
+                                      {breach}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="mt-4">
+                                <button className="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-colors">
+                                  Secure My Account →
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Recent Scans */}
                       <div className="bg-white rounded-2xl p-8 shadow-lg">
                         <div className="flex items-center justify-between mb-6">
@@ -1609,28 +1646,42 @@ export default function Home() {
                           )}
                         </div>
                         <div className="space-y-3">
-                          {sentinelData.recent_scans.map((scan: any, index: number) => (
-                            <div
-                              key={index}
-                              className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                            >
-                              <div className="flex items-center gap-4">
-                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                <div>
-                                  <div className="font-semibold text-gray-800">{scan.source}</div>
-                                  <div className="text-sm text-gray-500">
-                                    {scan.scannedItems.toLocaleString()} items scanned
+                          {sentinelData.recent_scans.map((scan: any, index: number) => {
+                            const severityColors = {
+                              clean: { dot: 'bg-green-500', badge: 'bg-green-100 text-green-700' },
+                              medium: { dot: 'bg-yellow-500', badge: 'bg-yellow-100 text-yellow-700' },
+                              high: { dot: 'bg-orange-500', badge: 'bg-orange-100 text-orange-700' },
+                              critical: { dot: 'bg-red-500', badge: 'bg-red-100 text-red-700' }
+                            };
+
+                            const colors = severityColors[scan.severity as keyof typeof severityColors] || severityColors.clean;
+
+                            return (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className={`w-2 h-2 ${colors.dot} rounded-full`}></div>
+                                  <div>
+                                    <div className="font-semibold text-gray-800">{scan.source}</div>
+                                    <div className="text-sm text-gray-500">
+                                      {scan.scannedItems.toLocaleString()} items scanned
+                                    </div>
+                                    {scan.details && (
+                                      <div className="text-xs text-gray-600 mt-1">{scan.details}</div>
+                                    )}
                                   </div>
                                 </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
-                                  {scan.status}
+                                <div className="text-right">
+                                  <div className={`px-3 py-1 ${colors.badge} rounded-full text-sm font-semibold`}>
+                                    {scan.status}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">{scan.timestamp}</div>
                                 </div>
-                                <div className="text-xs text-gray-500 mt-1">{scan.timestamp}</div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
