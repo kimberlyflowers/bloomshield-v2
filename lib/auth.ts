@@ -1,6 +1,7 @@
 import { authClient } from './better-auth-client';
 import { supabase } from './supabase';
 import { SignUpData, LoginData, UserProfile, AuthError } from '@/types/user';
+import { encrypt, decrypt, isEncrypted } from './crypto-utils';
 
 // Check if Better Auth is configured
 const isBetterAuthConfigured = () => {
@@ -44,13 +45,16 @@ async function signUpWithSupabase({ email, password, name }: SignUpData) {
   if (authError) return { success: false, error: { message: authError.message } };
   if (!authData.user) return { success: false, error: { message: 'Failed to create user' } };
 
+  // Encrypt seed phrase before storing
+  const encryptedSeedPhrase = await encrypt(wallet.seedPhrase);
+
   // Create user profile
   const { error: profileError } = await supabase.from('users').insert({
     id: authData.user.id,
     email,
     name: name || email.split('@')[0],
     wallet_address: wallet.address,
-    wallet_seed_phrase: wallet.seedPhrase,
+    wallet_seed_phrase: encryptedSeedPhrase, // ✅ Now encrypted
     account_type: 'free',
     role: 'creator',
     email_verified: false,
@@ -90,12 +94,14 @@ async function loginWithSupabase({ email, password }: LoginData) {
   if (profileError || !profile) {
     // Create profile if it doesn't exist
     const wallet = generateUserWallet();
+    const encryptedSeedPhrase = await encrypt(wallet.seedPhrase);
+
     const { error: insertError } = await supabase.from('users').insert({
       id: authData.user.id,
       email: authData.user.email!,
       name: authData.user.user_metadata?.name || authData.user.email!.split('@')[0],
       wallet_address: wallet.address,
-      wallet_seed_phrase: wallet.seedPhrase,
+      wallet_seed_phrase: encryptedSeedPhrase, // ✅ Now encrypted
       account_type: 'free',
       role: 'creator',
       email_verified: !!authData.user.email_confirmed_at,
@@ -115,12 +121,17 @@ async function loginWithSupabase({ email, password }: LoginData) {
       .single();
 
     if (newProfile) {
+      // Decrypt seed phrase if encrypted
+      const seedPhrase = isEncrypted(newProfile.wallet_seed_phrase)
+        ? await decrypt(newProfile.wallet_seed_phrase)
+        : newProfile.wallet_seed_phrase;
+
       const userProfile: UserProfile = {
         id: newProfile.id,
         email: newProfile.email,
         name: newProfile.name,
         walletAddress: newProfile.wallet_address,
-        walletSeedPhrase: newProfile.wallet_seed_phrase,
+        walletSeedPhrase: seedPhrase, // ✅ Decrypted for client use
         createdAt: newProfile.created_at,
         accountType: newProfile.account_type,
         role: newProfile.role,
@@ -131,12 +142,17 @@ async function loginWithSupabase({ email, password }: LoginData) {
     }
   }
 
+  // Decrypt seed phrase if encrypted (backward compatible)
+  const seedPhrase = isEncrypted(profile.wallet_seed_phrase)
+    ? await decrypt(profile.wallet_seed_phrase)
+    : profile.wallet_seed_phrase;
+
   const userProfile: UserProfile = {
     id: profile.id,
     email: profile.email,
     name: profile.name,
     walletAddress: profile.wallet_address,
-    walletSeedPhrase: profile.wallet_seed_phrase,
+    walletSeedPhrase: seedPhrase, // ✅ Decrypted for client use
     createdAt: profile.created_at,
     accountType: profile.account_type,
     role: profile.role,
@@ -161,12 +177,17 @@ async function getCurrentUserProfileSupabase(): Promise<UserProfile | null> {
 
   if (profileError || !profile) return null;
 
+  // Decrypt seed phrase if encrypted (backward compatible with old records)
+  const seedPhrase = isEncrypted(profile.wallet_seed_phrase)
+    ? await decrypt(profile.wallet_seed_phrase)
+    : profile.wallet_seed_phrase;
+
   return {
     id: profile.id,
     email: profile.email,
     name: profile.name,
     walletAddress: profile.wallet_address,
-    walletSeedPhrase: profile.wallet_seed_phrase,
+    walletSeedPhrase: seedPhrase, // ✅ Decrypted for client use
     createdAt: profile.created_at,
     accountType: profile.account_type,
     role: profile.role,

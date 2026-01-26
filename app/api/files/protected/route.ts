@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform to match frontend format
+    const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || 'https://gateway.pinata.cloud';
     const transformedFiles = (files || []).map(file => ({
       assetId: file.floral_hash,
       fileName: file.file_name,
@@ -70,9 +71,8 @@ export async function GET(request: NextRequest) {
       floralHash: file.floral_hash,
       blockchainTx: file.blockchain_tx,
       ownerWallet: user.user_metadata?.wallet_address || '',
-      ipfsHash: file.ipfs_hash || 'Qm' + Array.from({length: 44}, () =>
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 62)]
-      ).join(''),
+      ipfsHash: file.ipfs_hash || null, // ✅ Real IPFS CID or null
+      ipfsUrl: file.ipfs_hash ? `${gatewayUrl}/ipfs/${file.ipfs_hash}` : null, // ✅ Gateway URL for verification
       storagePath: file.storage_path,
       isListed: false // Will be checked against assets table
     }));

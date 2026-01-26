@@ -195,25 +195,92 @@ export default function Home() {
   }, [currentPage]);
 
   // PRESERVED: Hash generation function
+  // Generate perceptual hash for images (resistant to minor edits)
+  const generatePerceptualHash = async (file: File): Promise<string> => {
+    // Only generate perceptual hash for images
+    if (!file.type.startsWith('image/')) {
+      // For non-images, use a robust content-based hash
+      const arrayBuffer = await file.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return '0xC' + hashArray.slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      img.onload = () => {
+        try {
+          // Resize to 8x8 for perceptual hash (standard blockhash size)
+          const size = 8;
+          canvas.width = size;
+          canvas.height = size;
+
+          if (!ctx) {
+            reject(new Error('Canvas context not available'));
+            return;
+          }
+
+          // Draw image scaled down
+          ctx.drawImage(img, 0, 0, size, size);
+
+          // Get grayscale pixel data
+          const imageData = ctx.getImageData(0, 0, size, size);
+          const pixels = imageData.data;
+
+          // Convert to grayscale and calculate average
+          const grayscale: number[] = [];
+          for (let i = 0; i < pixels.length; i += 4) {
+            const gray = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+            grayscale.push(gray);
+          }
+
+          const average = grayscale.reduce((a, b) => a + b, 0) / grayscale.length;
+
+          // Create hash: 1 if pixel > average, 0 otherwise
+          let hash = '';
+          for (let i = 0; i < grayscale.length; i++) {
+            hash += grayscale[i] > average ? '1' : '0';
+          }
+
+          // Convert binary string to hex (perceptual hash)
+          const hexHash = BigInt('0b' + hash).toString(16).padStart(16, '0');
+          resolve('0xP' + hexHash);
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      img.onerror = () => reject(new Error('Failed to load image for perceptual hashing'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const generateHashes = async (file: File) => {
     try {
       const arrayBuffer = await file.arrayBuffer();
 
-      // Legal Hash (SHA-256)
+      // Legal Hash (SHA-256) - Binary fingerprint of exact file
       const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const legal = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-      // Content Hash (Perceptual)
-      const uint8Array = new Uint8Array(arrayBuffer);
-      let simpleSum = 0;
-      for (let i = 0; i < Math.min(uint8Array.length, 1000); i++) {
-        simpleSum += uint8Array[i];
-      }
-      const content = '0x' + (simpleSum % 10000000000000000).toString(16).padStart(16, '0');
+      // Content Hash (Perceptual) - Detects similar images even with minor edits
+      // For images: Uses 8x8 grayscale hash (like blockhash)
+      // For non-images: Uses truncated SHA-256 for content verification
+      const content = await generatePerceptualHash(file);
 
-      // Floral Hash (Visual) - This will be the Asset ID
+      // Floral Hash (Asset ID) - Human-readable deterministic identifier
       const floral = '🌸 BS-' + legal.substring(0, 4) + '-' + legal.substring(4, 8) + '-' + legal.substring(8, 12);
+
+      console.log('✅ Generated hashes:', {
+        legal: legal.substring(0, 16) + '...',
+        content: content,
+        floral: floral,
+        fileType: file.type
+      });
 
       return { legal, content, floral };
     } catch (error) {
@@ -286,9 +353,43 @@ export default function Home() {
 
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Step 3: Upload to Supabase Storage
-      setUploadStatus('Uploading to secure storage...');
+      // Step 3: Pin to IPFS via Pinata
+      setUploadStatus('Pinning to IPFS network...');
       setProcessingStep(4);
+
+      let ipfsCid: string | null = null;
+      let ipfsUrl: string | null = null;
+
+      try {
+        const ipfsFormData = new FormData();
+        ipfsFormData.append('file', fileToUpload);
+        ipfsFormData.append('fileName', fileToUpload.name);
+        ipfsFormData.append('floralHash', hashes.floral);
+
+        const ipfsResponse = await fetch('/api/ipfs/upload', {
+          method: 'POST',
+          body: ipfsFormData
+        });
+
+        const ipfsResult = await ipfsResponse.json();
+
+        if (ipfsResult.success) {
+          ipfsCid = ipfsResult.ipfsCid;
+          ipfsUrl = ipfsResult.ipfsUrl;
+          console.log(`✅ File pinned to IPFS: ${ipfsCid}`);
+        } else {
+          console.warn('⚠️ IPFS upload skipped:', ipfsResult.error);
+        }
+      } catch (ipfsError) {
+        console.warn('⚠️ IPFS upload failed (non-critical):', ipfsError);
+        // Continue without IPFS - it's not critical for protection
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Step 4: Upload to Supabase Storage
+      setUploadStatus('Uploading to secure storage...');
+      setProcessingStep(5);
 
       const fileName = `${hashes.legal.slice(0, 16)}_${Date.now()}_${fileToUpload.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -299,7 +400,7 @@ export default function Home() {
         throw uploadError;
       }
 
-      // Step 4: Save to Database
+      // Step 5: Save to Database
       setUploadStatus('Saving protection record...');
 
       // Get current user ID
@@ -321,6 +422,7 @@ export default function Home() {
           floral_hash: hashes.floral,
           blockchain_tx: blockchainTransactionHash,
           blockchain_timestamp: blockchainTimestamp,
+          ipfs_hash: ipfsCid, // ✅ Real IPFS CID from Pinata
         })
         .select()
         .single();
@@ -339,12 +441,7 @@ export default function Home() {
       const walletData = typeof window !== 'undefined' ? localStorage.getItem('userWallet') : null;
       const wallet = walletData ? JSON.parse(walletData) : null;
 
-      // Generate IPFS hash (simulated)
-      const ipfsHash = 'Qm' + Array.from({length: 44}, () =>
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 62)]
-      ).join('');
-
-      // Prepare certificate data with actual file information + blockchain info
+      // Prepare certificate data with actual file information + blockchain info + IPFS
       const certData = {
         assetId: hashes.floral,
         fileName: fileToUpload.name,
@@ -358,7 +455,8 @@ export default function Home() {
         floralHash: hashes.floral,
         blockchainTx: blockchainTransactionHash,
         ownerWallet: wallet?.address || 'No wallet',
-        ipfsHash: ipfsHash,
+        ipfsHash: ipfsCid || null, // ✅ Real IPFS CID from Pinata
+        ipfsUrl: ipfsUrl || null,  // ✅ Public gateway URL for verification
       };
       setCertificateData(certData);
 
