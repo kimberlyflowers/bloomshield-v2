@@ -3,6 +3,9 @@ import { createServerClient } from '@/lib/supabase-server';
 import { Polar } from '@polar-sh/sdk';
 import crypto from 'crypto';
 
+// Force dynamic rendering - this route uses cookies for authentication
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = createServerClient();
