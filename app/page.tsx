@@ -185,28 +185,11 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // PRESERVED: Supabase client initialization
+  // Supabase client initialization - uses SSR-compatible client
   const getSupabaseClient = () => {
     if (typeof window === 'undefined') return null;
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('Supabase environment variables not set');
-      return null;
-    }
-
-    try {
-      if (typeof window !== 'undefined') {
-        const { createClient } = require('@supabase/supabase-js');
-        return createClient(supabaseUrl, supabaseKey);
-      }
-      return null;
-    } catch (error) {
-      console.error('Failed to create Supabase client:', error);
-      return null;
-    }
+    const { getSupabaseBrowserClient } = require('@/lib/supabase/client');
+    return getSupabaseBrowserClient();
   };
 
   // PRESERVED: Hash generation function

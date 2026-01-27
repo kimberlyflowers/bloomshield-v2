@@ -1,14 +1,22 @@
-import { supabase } from './supabase';
+import { getSupabaseBrowserClient } from './supabase/client';
 import { SignUpData, LoginData, UserProfile, AuthError } from '@/types/user';
 
-// Generate wallet for new user
+/**
+ * Get the Supabase browser client
+ * Uses the SSR-compatible client for proper cookie handling
+ */
+function getClient() {
+  return getSupabaseBrowserClient();
+}
+
+/**
+ * Generate wallet for new user
+ */
 export function generateUserWallet() {
-  // Generate wallet address
   const address = '0x' + Array.from({ length: 40 }, () =>
     '0123456789abcdef'[Math.floor(Math.random() * 16)]
   ).join('');
 
-  // Generate 12-word seed phrase (BIP39 word list subset)
   const wordList = [
     'abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract',
     'absurd', 'abuse', 'access', 'accident', 'account', 'accuse', 'achieve', 'acid',
@@ -56,17 +64,56 @@ export function generateUserWallet() {
 }
 
 /**
+ * Convert Supabase auth user to UserProfile
+ * Creates profile from auth metadata - no database query needed
+ */
+function authUserToProfile(user: any): UserProfile {
+  const userId = user.id || '';
+  const userEmail = user.email || '';
+  const userName = user.user_metadata?.name || userEmail.split('@')[0] || 'User';
+
+  // Generate deterministic wallet address from user ID
+  const walletAddress = '0x' + (userId.replace(/-/g, '') + '0'.repeat(40)).substring(0, 40);
+
+  return {
+    id: userId,
+    email: userEmail,
+    name: userName,
+    walletAddress,
+    walletSeedPhrase: user.user_metadata?.wallet_seed_phrase || '',
+    createdAt: user.created_at || new Date().toISOString(),
+    accountType: user.user_metadata?.account_type || 'free',
+    role: user.user_metadata?.role || 'creator',
+    phone: user.user_metadata?.phone,
+    bio: user.user_metadata?.bio,
+    profilePhoto: user.user_metadata?.profile_photo,
+    businessName: user.user_metadata?.business_name,
+    businessWebsite: user.user_metadata?.business_website,
+    industry: user.user_metadata?.industry,
+    socialLinks: user.user_metadata?.social_links,
+    emailVerified: !!user.email_confirmed_at,
+    twoFactorEnabled: user.user_metadata?.two_factor_enabled || false
+  };
+}
+
+/**
  * Sign up a new user
  */
 export async function signUp({ email, password, name }: SignUpData): Promise<{ success: boolean; error?: AuthError; userId?: string }> {
   try {
-    // 1. Create auth user
+    const supabase = getClient();
+    const wallet = generateUserWallet();
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          name
+          name,
+          wallet_address: wallet.address,
+          wallet_seed_phrase: wallet.seedPhrase,
+          account_type: 'free',
+          role: 'creator'
         },
         emailRedirectTo: `${window.location.origin}/auth/callback`
       }
@@ -89,31 +136,6 @@ export async function signUp({ email, password, name }: SignUpData): Promise<{ s
       };
     }
 
-    // 2. Generate wallet
-    const wallet = generateUserWallet();
-
-    // 3. Create user profile in database
-    const { error: profileError } = await supabase
-      .from('users')
-      .insert({
-        id: authData.user.id,
-        email,
-        name,
-        wallet_address: wallet.address,
-        wallet_seed_phrase: wallet.seedPhrase, // TODO: Encrypt in production
-        created_at: new Date().toISOString(),
-        account_type: 'free',
-        role: 'creator',
-        email_verified: false,
-        two_factor_enabled: false
-      });
-
-    if (profileError) {
-      console.error('Error creating user profile:', profileError);
-      // Auth user was created but profile failed - user can still log in
-      // but won't have full profile
-    }
-
     return {
       success: true,
       userId: authData.user.id
@@ -134,6 +156,8 @@ export async function signUp({ email, password, name }: SignUpData): Promise<{ s
  */
 export async function login({ email, password }: LoginData): Promise<{ success: boolean; error?: AuthError; user?: UserProfile }> {
   try {
+    const supabase = getClient();
+
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -158,7 +182,6 @@ export async function login({ email, password }: LoginData): Promise<{ success: 
 
     // Check if email is verified
     if (!authData.user.email_confirmed_at) {
-      // Sign out unverified user
       await supabase.auth.signOut();
       return {
         success: false,
@@ -169,34 +192,7 @@ export async function login({ email, password }: LoginData): Promise<{ success: 
       };
     }
 
-    // TEMPORARY FIX: Create profile from auth data to bypass database query
-    // TODO: Fix RLS policies and database query
-
-    // Validate we have required user data
-    if (!authData.user || !authData.user.id || !authData.user.email) {
-      console.error('Invalid user data from auth:', authData);
-      return {
-        success: false,
-        error: { message: 'Invalid authentication data received' }
-      };
-    }
-
-    const userName = authData.user.user_metadata?.name || authData.user.email.split('@')[0] || 'User';
-    const userId = authData.user.id || '';
-    const walletAddress = '0x' + (userId.replace(/-/g, '') + '0000000000000000000000000000000000000000').substring(0, 40);
-
-    const userProfile: UserProfile = {
-      id: authData.user.id,
-      email: authData.user.email,
-      name: userName,
-      walletAddress: walletAddress,
-      walletSeedPhrase: 'temporary seed phrase - please update in settings',
-      createdAt: authData.user.created_at || new Date().toISOString(),
-      accountType: 'free',
-      role: 'creator',
-      emailVerified: !!authData.user.email_confirmed_at,
-      twoFactorEnabled: false
-    };
+    const userProfile = authUserToProfile(authData.user);
 
     return {
       success: true,
@@ -218,14 +214,13 @@ export async function login({ email, password }: LoginData): Promise<{ success: 
  */
 export async function logout(): Promise<{ success: boolean; error?: AuthError }> {
   try {
+    const supabase = getClient();
     const { error } = await supabase.auth.signOut();
 
     if (error) {
       return {
         success: false,
-        error: {
-          message: error.message
-        }
+        error: { message: error.message }
       };
     }
 
@@ -246,6 +241,7 @@ export async function logout(): Promise<{ success: boolean; error?: AuthError }>
  */
 export async function resetPassword(email: string): Promise<{ success: boolean; error?: AuthError }> {
   try {
+    const supabase = getClient();
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/reset-password`
     });
@@ -253,9 +249,7 @@ export async function resetPassword(email: string): Promise<{ success: boolean; 
     if (error) {
       return {
         success: false,
-        error: {
-          message: error.message
-        }
+        error: { message: error.message }
       };
     }
 
@@ -276,6 +270,7 @@ export async function resetPassword(email: string): Promise<{ success: boolean; 
  */
 export async function updatePassword(newPassword: string): Promise<{ success: boolean; error?: AuthError }> {
   try {
+    const supabase = getClient();
     const { error } = await supabase.auth.updateUser({
       password: newPassword
     });
@@ -283,9 +278,7 @@ export async function updatePassword(newPassword: string): Promise<{ success: bo
     if (error) {
       return {
         success: false,
-        error: {
-          message: error.message
-        }
+        error: { message: error.message }
       };
     }
 
@@ -306,6 +299,7 @@ export async function updatePassword(newPassword: string): Promise<{ success: bo
  */
 export async function getSession() {
   try {
+    const supabase = getClient();
     const { data: { session }, error } = await supabase.auth.getSession();
 
     if (error) {
@@ -321,46 +315,18 @@ export async function getSession() {
 }
 
 /**
- * Get current user profile
+ * Get current user
  */
-export async function getCurrentUserProfile(): Promise<UserProfile | null> {
+export async function getCurrentUser(): Promise<UserProfile | null> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const supabase = getClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (error || !user) {
       return null;
     }
 
-    const { data: profile, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-    if (error || !profile) {
-      console.error('Error fetching profile:', error);
-      return null;
-    }
-
-    return {
-      id: profile.id,
-      email: profile.email,
-      name: profile.name,
-      walletAddress: profile.wallet_address,
-      walletSeedPhrase: profile.wallet_seed_phrase,
-      createdAt: profile.created_at,
-      accountType: profile.account_type,
-      role: profile.role,
-      phone: profile.phone,
-      bio: profile.bio,
-      profilePhoto: profile.profile_photo,
-      businessName: profile.business_name,
-      businessWebsite: profile.business_website,
-      industry: profile.industry,
-      socialLinks: profile.social_links,
-      emailVerified: profile.email_verified,
-      twoFactorEnabled: profile.two_factor_enabled
-    };
+    return authUserToProfile(user);
   } catch (error) {
     console.error('Get current user error:', error);
     return null;
@@ -369,14 +335,58 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
 
 /**
  * Subscribe to auth state changes
+ * Uses auth metadata directly - no database queries
  */
 export function onAuthStateChange(callback: (user: UserProfile | null) => void) {
-  return supabase.auth.onAuthStateChange(async (event, session) => {
+  const supabase = getClient();
+
+  return supabase.auth.onAuthStateChange(async (event: string, session: any) => {
+    console.log('Auth state changed:', event);
+
     if (session?.user) {
-      const profile = await getCurrentUserProfile();
+      const profile = authUserToProfile(session.user);
       callback(profile);
     } else {
       callback(null);
     }
   });
+}
+
+/**
+ * Update user profile metadata
+ */
+export async function updateUserProfile(data: Partial<UserProfile>): Promise<{ success: boolean; error?: AuthError }> {
+  try {
+    const supabase = getClient();
+
+    const { error } = await supabase.auth.updateUser({
+      data: {
+        name: data.name,
+        phone: data.phone,
+        bio: data.bio,
+        profile_photo: data.profilePhoto,
+        business_name: data.businessName,
+        business_website: data.businessWebsite,
+        industry: data.industry,
+        social_links: data.socialLinks
+      }
+    });
+
+    if (error) {
+      return {
+        success: false,
+        error: { message: error.message }
+      };
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Update profile error:', error);
+    return {
+      success: false,
+      error: {
+        message: error.message || 'Failed to update profile'
+      }
+    };
+  }
 }
