@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     if (files && files.length > 0) {
       console.log(`📄 Sample files (first 3):`);
       files.slice(0, 3).forEach((f, idx) => {
-        console.log(`  [${idx}] user_id: ${f.user_id}, file_name: ${f.file_name}`);
+        console.log(`  [${idx}] user_id: ${f.user_id}, name: ${f.name}`);
       });
     } else {
       console.log(`⚠️ NO FILES FOUND for user_id: ${user.id}`);
@@ -62,8 +62,8 @@ export async function GET(request: NextRequest) {
     // Transform to match frontend format
     const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || 'https://gateway.pinata.cloud';
     const transformedFiles = (files || []).map(file => ({
-      assetId: file.floral_hash,
-      fileName: file.file_name,
+      assetId: file.floral_id,
+      fileName: file.name,
       fileType: file.mime_type,
       fileSize: `${(file.file_size / 1024 / 1024).toFixed(2)} MB`,
       protectedDate: file.created_at,
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
       email: user.email || '',
       legalHash: file.legal_hash,
       contentHash: file.content_hash,
-      floralHash: file.floral_hash,
+      floralHash: file.floral_id,
       blockchainTx: file.blockchain_tx,
       ownerWallet: user.user_metadata?.wallet_address || '',
       ipfsHash: file.ipfs_hash || null, // ✅ Real IPFS CID or null
@@ -143,13 +143,13 @@ export async function POST(request: NextRequest) {
       .from('protected_files')
       .insert({
         user_id: user.id,
-        file_name: fileName,
+        name: fileName,
         file_size: fileSize,
         mime_type: fileType,
         storage_path: storagePath || null,
         legal_hash: legalHash,
         content_hash: contentHash,
-        floral_hash: floralHash,
+        floral_id: floralHash,
         blockchain_tx: blockchainTx,
         blockchain_timestamp: blockchainTimestamp ? new Date(blockchainTimestamp).toISOString() : null,
         ipfs_hash: ipfsHash || null,
@@ -168,8 +168,8 @@ export async function POST(request: NextRequest) {
 
     // Transform to frontend format
     const transformedFile = {
-      assetId: data.floral_hash,
-      fileName: data.file_name,
+      assetId: data.floral_id,
+      fileName: data.name,
       fileType: data.mime_type,
       fileSize: `${(data.file_size / 1024 / 1024).toFixed(2)} MB`,
       protectedDate: data.created_at,
@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
       email: user.email || '',
       legalHash: data.legal_hash,
       contentHash: data.content_hash,
-      floralHash: data.floral_hash,
+      floralHash: data.floral_id,
       blockchainTx: data.blockchain_tx,
       ownerWallet: user.user_metadata?.wallet_address || '',
       ipfsHash: data.ipfs_hash || 'Qm' + Array.from({length: 44}, () =>

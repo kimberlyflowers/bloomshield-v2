@@ -132,10 +132,10 @@ export async function GET(request: NextRequest) {
     // Fetch user's protected files for monitoring
     const { data: files } = await supabase
       .from('protected_files')
-      .select('floral_hash, content_hash, file_name')
+      .select('floral_id, content_hash, name')
       .eq('user_id', user.id);
 
-    const fileHashes = files?.map(f => f.content_hash || f.floral_hash) || [];
+    const fileHashes = files?.map(f => f.content_hash || f.floral_id) || [];
 
     // Run parallel security checks
     const [

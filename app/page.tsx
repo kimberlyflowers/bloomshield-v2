@@ -57,6 +57,7 @@ export default function Home() {
   const [sentinelData, setSentinelData] = useState<any>(null);
   const [sentinelLoading, setSentinelLoading] = useState(false);
   const [lastScanTime, setLastScanTime] = useState<string | null>(null);
+  const [sentinelHistory, setSentinelHistory] = useState<any[]>([]);
 
   // Wallet submenu state
   const [walletSection, setWalletSection] = useState('overview');
@@ -205,6 +206,7 @@ export default function Home() {
       if (currentPage === 'dashboard' && dashboardSection === 'monitoring' && !sentinelLoading) {
         setSentinelLoading(true);
         try {
+          // Fetch current scan
           const response = await fetch('/api/sentinel/scan');
           const data = await response.json();
 
@@ -212,6 +214,18 @@ export default function Home() {
             setSentinelData(data);
             setLastScanTime(new Date().toLocaleTimeString());
             console.log('🛡️ Sentinel scan data loaded:', data.sources_scanned.toLocaleString(), 'sources');
+          }
+
+          // Fetch scan history from database
+          const { data: historyData, error: historyError } = await supabase
+            .from('sentinel_scans')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+          if (!historyError && historyData) {
+            setSentinelHistory(historyData);
+            console.log('📊 Loaded', historyData.length, 'historical scans');
           }
         } catch (error) {
           console.error('Failed to fetch Sentinel data:', error);
@@ -452,13 +466,13 @@ export default function Home() {
         .from('protected_files')
         .insert({
           user_id: user.id,
-          file_name: fileToUpload.name,
+          name: fileToUpload.name,
           file_size: fileToUpload.size,
           mime_type: fileToUpload.type,
           storage_path: uploadData?.path || fileName,
           legal_hash: hashes.legal,
           content_hash: hashes.content,
-          floral_hash: hashes.floral,
+          floral_id: hashes.floral,
           blockchain_tx: blockchainTransactionHash,
           blockchain_timestamp: blockchainTimestamp,
           ipfs_hash: ipfsCid, // ✅ Real IPFS CID from Pinata
@@ -1684,6 +1698,59 @@ export default function Home() {
                           })}
                         </div>
                       </div>
+
+                      {/* Scan History from Database */}
+                      {sentinelHistory.length > 0 && (
+                        <div className="bg-white rounded-2xl p-8 shadow-lg mt-6">
+                          <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-2xl font-bold text-gray-800">Scan History</h3>
+                            <span className="text-sm text-gray-500">{sentinelHistory.length} recent scans</span>
+                          </div>
+                          <div className="space-y-3">
+                            {sentinelHistory.map((scan: any, index: number) => {
+                              const scanDate = new Date(scan.created_at);
+                              const timeAgo = Math.floor((Date.now() - scanDate.getTime()) / 1000 / 60); // minutes ago
+                              const displayTime = timeAgo < 60
+                                ? `${timeAgo} mins ago`
+                                : timeAgo < 1440
+                                ? `${Math.floor(timeAgo / 60)} hours ago`
+                                : `${Math.floor(timeAgo / 1440)} days ago`;
+
+                              const hasLeaks = scan.leaks_found > 0;
+
+                              return (
+                                <div
+                                  key={scan.id}
+                                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                                >
+                                  <div className="flex items-center gap-4">
+                                    <div className={`w-2 h-2 ${hasLeaks ? 'bg-red-500' : 'bg-green-500'} rounded-full`}></div>
+                                    <div>
+                                      <div className="font-semibold text-gray-800">
+                                        {scanDate.toLocaleString('en-US', {
+                                          month: 'short',
+                                          day: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        {scan.sources_scanned.toLocaleString()} sources scanned
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className={`px-3 py-1 ${hasLeaks ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'} rounded-full text-sm font-semibold`}>
+                                      {hasLeaks ? `${scan.leaks_found} Leaks Found` : 'Clean'}
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-1">{displayTime}</div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="bg-white rounded-2xl p-12 text-center shadow-lg">

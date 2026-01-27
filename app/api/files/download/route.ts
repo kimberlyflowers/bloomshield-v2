@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     if (fileId) {
       query = query.eq('id', fileId);
     } else if (floralHash) {
-      query = query.eq('floral_hash', floralHash);
+      query = query.eq('floral_id', floralHash);
     }
 
     const { data: file, error: fileError } = await query.single();
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
       const { data: asset } = await supabase
         .from('assets')
         .select('*')
-        .eq('floral_id', file.floral_hash)
+        .eq('floral_id', file.floral_id)
         .single();
 
       if (asset) {
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
           const { data: lease } = await supabase
             .from('leases')
             .select('*')
-            .eq('floral_id', file.floral_hash)
+            .eq('floral_id', file.floral_id)
             .eq('lessee_uid', user.id)
             .eq('active', true)
             .single();
