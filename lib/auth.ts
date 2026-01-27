@@ -1,382 +1,410 @@
+import { authClient } from './better-auth-client';
 import { supabase } from './supabase';
 import { SignUpData, LoginData, UserProfile, AuthError } from '@/types/user';
+import { encrypt, decrypt, isEncrypted } from './crypto-utils';
 
-// Generate wallet for new user
+// Check if Better Auth is configured
+const isBetterAuthConfigured = () => {
+  return !!process.env.DATABASE_URL && process.env.DATABASE_URL !== 'postgresql://postgres:password@db.xxxxx.supabase.co:5432/postgres';
+};
+
 export function generateUserWallet() {
-  // Generate wallet address
   const address = '0x' + Array.from({ length: 40 }, () =>
     '0123456789abcdef'[Math.floor(Math.random() * 16)]
   ).join('');
 
-  // Generate 12-word seed phrase (BIP39 word list subset)
-  const wordList = [
-    'abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract',
-    'absurd', 'abuse', 'access', 'accident', 'account', 'accuse', 'achieve', 'acid',
-    'acoustic', 'acquire', 'across', 'act', 'action', 'actor', 'actress', 'actual',
-    'adapt', 'add', 'addict', 'address', 'adjust', 'admit', 'adult', 'advance',
-    'advice', 'aerobic', 'afford', 'afraid', 'again', 'age', 'agent', 'agree',
-    'ahead', 'aim', 'air', 'airport', 'aisle', 'alarm', 'album', 'alcohol',
-    'alert', 'alien', 'all', 'alley', 'allow', 'almost', 'alone', 'alpha',
-    'already', 'also', 'alter', 'always', 'amateur', 'amazing', 'among', 'amount',
-    'amused', 'analyst', 'anchor', 'ancient', 'anger', 'angle', 'angry', 'animal',
-    'ankle', 'announce', 'annual', 'another', 'answer', 'antenna', 'antique', 'anxiety',
-    'any', 'apart', 'apology', 'appear', 'apple', 'approve', 'april', 'arch',
-    'arctic', 'area', 'arena', 'argue', 'arm', 'armed', 'armor', 'army',
-    'around', 'arrange', 'arrest', 'arrive', 'arrow', 'art', 'artefact', 'artist',
-    'artwork', 'ask', 'aspect', 'assault', 'asset', 'assist', 'assume', 'asthma',
-    'athlete', 'atom', 'attack', 'attend', 'attitude', 'attract', 'auction', 'audit',
-    'august', 'aunt', 'author', 'auto', 'autumn', 'average', 'avocado', 'avoid',
-    'awake', 'aware', 'away', 'awesome', 'awful', 'awkward', 'axis', 'baby',
-    'bachelor', 'bacon', 'badge', 'bag', 'balance', 'balcony', 'ball', 'bamboo',
-    'banana', 'banner', 'bar', 'barely', 'bargain', 'barrel', 'base', 'basic',
-    'basket', 'battle', 'beach', 'bean', 'beauty', 'because', 'become', 'beef',
-    'before', 'begin', 'behave', 'behind', 'believe', 'below', 'belt', 'bench',
-    'benefit', 'best', 'betray', 'better', 'between', 'beyond', 'bicycle', 'bid',
-    'bike', 'bind', 'biology', 'bird', 'birth', 'bitter', 'black', 'blade',
-    'blame', 'blanket', 'blast', 'bleak', 'bless', 'blind', 'blood', 'blossom',
-    'blouse', 'blue', 'blur', 'blush', 'board', 'boat', 'body', 'boil',
-    'bomb', 'bone', 'bonus', 'book', 'boost', 'border', 'boring', 'borrow',
-    'boss', 'bottom', 'bounce', 'box', 'boy', 'bracket', 'brain', 'brand',
-    'brass', 'brave', 'bread', 'breeze', 'brick', 'bridge', 'brief', 'bright',
-    'bring', 'brisk', 'broccoli', 'broken', 'bronze', 'broom', 'brother', 'brown',
-    'brush', 'bubble', 'buddy', 'budget', 'buffalo', 'build', 'bulb', 'bulk',
-    'bullet', 'bundle', 'bunker', 'burden', 'burger', 'burst', 'bus', 'business',
-    'busy', 'butter', 'buyer', 'buzz'
-  ];
-
+  const wordList = ['abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract'];
   const seedPhrase = [];
   for (let i = 0; i < 12; i++) {
     seedPhrase.push(wordList[Math.floor(Math.random() * wordList.length)]);
   }
 
+  return { address, seedPhrase: seedPhrase.join(' ') };
+}
+
+// Supabase Auth fallback functions
+async function signUpWithSupabase({ email, password, name }: SignUpData) {
+  if (!supabase) {
+    return { success: false, error: { message: 'Supabase client not initialized' } };
+  }
+
+  // Generate wallet for new user
+  const wallet = generateUserWallet();
+
+  // Create auth user
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        name: name || email.split('@')[0]
+      }
+    }
+  });
+
+  if (authError) return { success: false, error: { message: authError.message } };
+  if (!authData.user) return { success: false, error: { message: 'Failed to create user' } };
+
+  // Encrypt seed phrase before storing
+  const encryptedSeedPhrase = await encrypt(wallet.seedPhrase);
+
+  // Create user profile
+  const { error: profileError } = await supabase.from('users').insert({
+    id: authData.user.id,
+    email,
+    name: name || email.split('@')[0],
+    wallet_address: wallet.address,
+    wallet_seed_phrase: encryptedSeedPhrase, // ✅ Now encrypted
+    account_type: 'free',
+    role: 'creator',
+    email_verified: false,
+    two_factor_enabled: false,
+    created_at: new Date().toISOString()
+  });
+
+  if (profileError) {
+    console.error('Profile creation error:', profileError);
+  }
+
+  return { success: true, userId: authData.user.id };
+}
+
+async function loginWithSupabase({ email, password }: LoginData) {
+  if (!supabase) {
+    return { success: false, error: { message: 'Supabase client not initialized' } };
+  }
+
+  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (authError) return { success: false, error: { message: authError.message } };
+  if (!authData.user) return { success: false, error: { message: 'Login failed' } };
+
+  console.log(`✅ Supabase Auth: Logged in as ${authData.user.email} (ID: ${authData.user.id})`);
+
+  // Get user profile
+  const { data: profile, error: profileError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', authData.user.id)
+    .single();
+
+  if (profileError || !profile) {
+    // Create profile if it doesn't exist
+    const wallet = generateUserWallet();
+    const encryptedSeedPhrase = await encrypt(wallet.seedPhrase);
+
+    const { error: insertError } = await supabase.from('users').insert({
+      id: authData.user.id,
+      email: authData.user.email!,
+      name: authData.user.user_metadata?.name || authData.user.email!.split('@')[0],
+      wallet_address: wallet.address,
+      wallet_seed_phrase: encryptedSeedPhrase, // ✅ Now encrypted
+      account_type: 'free',
+      role: 'creator',
+      email_verified: !!authData.user.email_confirmed_at,
+      two_factor_enabled: false,
+      created_at: authData.user.created_at
+    });
+
+    if (insertError) {
+      console.error('Failed to create profile:', insertError);
+    }
+
+    // Fetch the newly created profile
+    const { data: newProfile } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single();
+
+    if (newProfile) {
+      // Decrypt seed phrase if encrypted
+      const seedPhrase = isEncrypted(newProfile.wallet_seed_phrase)
+        ? await decrypt(newProfile.wallet_seed_phrase)
+        : newProfile.wallet_seed_phrase;
+
+      const userProfile: UserProfile = {
+        id: newProfile.id,
+        email: newProfile.email,
+        name: newProfile.name,
+        walletAddress: newProfile.wallet_address,
+        walletSeedPhrase: seedPhrase, // ✅ Decrypted for client use
+        createdAt: newProfile.created_at,
+        accountType: newProfile.account_type,
+        role: newProfile.role,
+        emailVerified: newProfile.email_verified,
+        twoFactorEnabled: newProfile.two_factor_enabled
+      };
+      return { success: true, user: userProfile };
+    }
+  }
+
+  // Decrypt seed phrase if encrypted (backward compatible)
+  const seedPhrase = isEncrypted(profile.wallet_seed_phrase)
+    ? await decrypt(profile.wallet_seed_phrase)
+    : profile.wallet_seed_phrase;
+
+  const userProfile: UserProfile = {
+    id: profile.id,
+    email: profile.email,
+    name: profile.name,
+    walletAddress: profile.wallet_address,
+    walletSeedPhrase: seedPhrase, // ✅ Decrypted for client use
+    createdAt: profile.created_at,
+    accountType: profile.account_type,
+    role: profile.role,
+    emailVerified: profile.email_verified,
+    twoFactorEnabled: profile.two_factor_enabled
+  };
+
+  return { success: true, user: userProfile };
+}
+
+async function getCurrentUserProfileSupabase(): Promise<UserProfile | null> {
+  if (!supabase) return null;
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return null;
+
+  const { data: profile, error: profileError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError || !profile) return null;
+
+  // Decrypt seed phrase if encrypted (backward compatible with old records)
+  const seedPhrase = isEncrypted(profile.wallet_seed_phrase)
+    ? await decrypt(profile.wallet_seed_phrase)
+    : profile.wallet_seed_phrase;
+
   return {
-    address,
-    seedPhrase: seedPhrase.join(' ')
+    id: profile.id,
+    email: profile.email,
+    name: profile.name,
+    walletAddress: profile.wallet_address,
+    walletSeedPhrase: seedPhrase, // ✅ Decrypted for client use
+    createdAt: profile.created_at,
+    accountType: profile.account_type,
+    role: profile.role,
+    emailVerified: profile.email_verified,
+    twoFactorEnabled: profile.two_factor_enabled
   };
 }
 
-/**
- * Sign up a new user
- */
-export async function signUp({ email, password, name }: SignUpData): Promise<{ success: boolean; error?: AuthError; userId?: string }> {
+async function logoutSupabase() {
+  if (!supabase) {
+    return { success: false, error: { message: 'Supabase client not initialized' } };
+  }
+  const { error } = await supabase.auth.signOut();
+  if (error) return { success: false, error: { message: error.message } };
+  return { success: true };
+}
+
+// Better Auth functions (with fallback)
+async function signUpWithBetterAuth({ email, password, name }: SignUpData) {
   try {
-    // 1. Create auth user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { data, error } = await authClient.signUp.email({
       email,
       password,
-      options: {
-        data: {
-          name
-        },
-        emailRedirectTo: `${window.location.origin}/auth/callback`
-      }
+      name
     });
 
-    if (authError) {
-      return {
-        success: false,
-        error: {
-          message: authError.message,
-          code: authError.status?.toString()
-        }
-      };
-    }
-
-    if (!authData.user) {
-      return {
-        success: false,
-        error: { message: 'Failed to create user' }
-      };
-    }
-
-    // 2. Generate wallet
-    const wallet = generateUserWallet();
-
-    // 3. Create user profile in database
-    const { error: profileError } = await supabase
-      .from('users')
-      .insert({
-        id: authData.user.id,
-        email,
-        name,
-        wallet_address: wallet.address,
-        wallet_seed_phrase: wallet.seedPhrase, // TODO: Encrypt in production
-        created_at: new Date().toISOString(),
-        account_type: 'free',
-        role: 'creator',
-        email_verified: false,
-        two_factor_enabled: false
-      });
-
-    if (profileError) {
-      console.error('Error creating user profile:', profileError);
-      // Auth user was created but profile failed - user can still log in
-      // but won't have full profile
-    }
-
-    return {
-      success: true,
-      userId: authData.user.id
-    };
+    if (error) return { success: false, error: { message: error.message || 'Sign up failed' } };
+    return { success: true, userId: data?.user?.id };
   } catch (error: any) {
-    console.error('Sign up error:', error);
-    return {
-      success: false,
-      error: {
-        message: error.message || 'An unexpected error occurred'
-      }
-    };
+    console.error('Better Auth signup error:', error);
+    throw error;
   }
 }
 
-/**
- * Log in existing user
- */
-export async function login({ email, password }: LoginData): Promise<{ success: boolean; error?: AuthError; user?: UserProfile }> {
+async function loginWithBetterAuth({ email, password }: LoginData) {
   try {
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    const { data, error } = await authClient.signIn.email({ email, password });
 
-    if (authError) {
-      return {
-        success: false,
-        error: {
-          message: authError.message,
-          code: authError.status?.toString()
-        }
-      };
-    }
-
-    if (!authData.user) {
-      return {
-        success: false,
-        error: { message: 'Login failed' }
-      };
-    }
-
-    // Check if email is verified
-    if (!authData.user.email_confirmed_at) {
-      // Sign out unverified user
-      await supabase.auth.signOut();
-      return {
-        success: false,
-        error: {
-          message: 'Please verify your email before logging in. Check your inbox for the verification link.',
-          code: 'email_not_verified'
-        }
-      };
-    }
-
-    // TEMPORARY FIX: Create profile from auth data to bypass database query
-    // TODO: Fix RLS policies and database query
-
-    // Validate we have required user data
-    if (!authData.user || !authData.user.id || !authData.user.email) {
-      console.error('Invalid user data from auth:', authData);
-      return {
-        success: false,
-        error: { message: 'Invalid authentication data received' }
-      };
-    }
-
-    const userName = authData.user.user_metadata?.name || authData.user.email.split('@')[0] || 'User';
-    const userId = authData.user.id || '';
-    const walletAddress = '0x' + (userId.replace(/-/g, '') + '0000000000000000000000000000000000000000').substring(0, 40);
+    if (error) return { success: false, error: { message: error.message || 'Login failed' } };
+    if (!data?.user) return { success: false, error: { message: 'Login failed - no user data' } };
 
     const userProfile: UserProfile = {
-      id: authData.user.id,
-      email: authData.user.email,
-      name: userName,
-      walletAddress: walletAddress,
-      walletSeedPhrase: 'temporary seed phrase - please update in settings',
-      createdAt: authData.user.created_at || new Date().toISOString(),
-      accountType: 'free',
-      role: 'creator',
-      emailVerified: !!authData.user.email_confirmed_at,
+      id: data.user.id,
+      email: data.user.email,
+      name: data.user.name || data.user.email.split('@')[0],
+      walletAddress: (data.user as any).walletAddress || '',
+      walletSeedPhrase: (data.user as any).walletSeedPhrase || '',
+      createdAt: new Date(data.user.createdAt).toISOString(),
+      accountType: (data.user as any).accountType || 'free',
+      role: (data.user as any).role || 'creator',
+      emailVerified: data.user.emailVerified,
       twoFactorEnabled: false
     };
 
-    return {
-      success: true,
-      user: userProfile
-    };
+    return { success: true, user: userProfile };
   } catch (error: any) {
-    console.error('Login error:', error);
-    return {
-      success: false,
-      error: {
-        message: error.message || 'An unexpected error occurred during login'
-      }
-    };
+    console.error('Better Auth login error:', error);
+    throw error;
   }
 }
 
-/**
- * Log out current user
- */
+async function getCurrentUserProfileBetterAuth(): Promise<UserProfile | null> {
+  try {
+    const { data } = await authClient.getSession();
+    if (!data?.user) return null;
+
+    const user = data.user;
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name || user.email.split('@')[0],
+      walletAddress: (user as any).walletAddress || '',
+      walletSeedPhrase: (user as any).walletSeedPhrase || '',
+      createdAt: new Date(user.createdAt).toISOString(),
+      accountType: (user as any).accountType || 'free',
+      role: (user as any).role || 'creator',
+      emailVerified: user.emailVerified,
+      twoFactorEnabled: false
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+async function logoutBetterAuth() {
+  try {
+    await authClient.signOut();
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: { message: error.message || 'Logout failed' } };
+  }
+}
+
+// Public API with hybrid fallback logic
+export async function signUp({ email, password, name }: SignUpData): Promise<{ success: boolean; error?: AuthError; userId?: string }> {
+  try {
+    // Try Better Auth first if configured
+    if (isBetterAuthConfigured()) {
+      try {
+        return await signUpWithBetterAuth({ email, password, name });
+      } catch (betterAuthError) {
+        console.log('Better Auth not available, falling back to Supabase Auth');
+      }
+    }
+
+    // Fallback to Supabase Auth
+    return await signUpWithSupabase({ email, password, name });
+  } catch (error: any) {
+    return { success: false, error: { message: error.message || 'An unexpected error occurred' } };
+  }
+}
+
+export async function login({ email, password }: LoginData): Promise<{ success: boolean; error?: AuthError; user?: UserProfile }> {
+  try {
+    // Try Better Auth first if configured
+    if (isBetterAuthConfigured()) {
+      try {
+        return await loginWithBetterAuth({ email, password });
+      } catch (betterAuthError) {
+        console.log('Better Auth not available, falling back to Supabase Auth');
+      }
+    }
+
+    // Fallback to Supabase Auth
+    return await loginWithSupabase({ email, password });
+  } catch (error: any) {
+    return { success: false, error: { message: error.message || 'An unexpected error occurred' } };
+  }
+}
+
 export async function logout(): Promise<{ success: boolean; error?: AuthError }> {
   try {
-    const { error } = await supabase.auth.signOut();
-
-    if (error) {
-      return {
-        success: false,
-        error: {
-          message: error.message
-        }
-      };
-    }
-
-    return { success: true };
-  } catch (error: any) {
-    console.error('Logout error:', error);
-    return {
-      success: false,
-      error: {
-        message: error.message || 'Failed to log out'
+    // Try both auth systems
+    if (isBetterAuthConfigured()) {
+      try {
+        await logoutBetterAuth();
+      } catch (e) {
+        // Ignore Better Auth errors
       }
-    };
-  }
-}
-
-/**
- * Send password reset email
- */
-export async function resetPassword(email: string): Promise<{ success: boolean; error?: AuthError }> {
-  try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`
-    });
-
-    if (error) {
-      return {
-        success: false,
-        error: {
-          message: error.message
-        }
-      };
     }
 
-    return { success: true };
+    return await logoutSupabase();
   } catch (error: any) {
-    console.error('Password reset error:', error);
-    return {
-      success: false,
-      error: {
-        message: error.message || 'Failed to send reset email'
-      }
-    };
+    return { success: false, error: { message: error.message || 'Logout failed' } };
   }
 }
 
-/**
- * Update password (when user is logged in)
- */
-export async function updatePassword(newPassword: string): Promise<{ success: boolean; error?: AuthError }> {
-  try {
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword
-    });
-
-    if (error) {
-      return {
-        success: false,
-        error: {
-          message: error.message
-        }
-      };
-    }
-
-    return { success: true };
-  } catch (error: any) {
-    console.error('Password update error:', error);
-    return {
-      success: false,
-      error: {
-        message: error.message || 'Failed to update password'
-      }
-    };
-  }
-}
-
-/**
- * Get current session
- */
-export async function getSession() {
-  try {
-    const { data: { session }, error } = await supabase.auth.getSession();
-
-    if (error) {
-      console.error('Session error:', error);
-      return null;
-    }
-
-    return session;
-  } catch (error) {
-    console.error('Get session error:', error);
-    return null;
-  }
-}
-
-/**
- * Get current user profile
- */
 export async function getCurrentUserProfile(): Promise<UserProfile | null> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return null;
+    // Try Better Auth first if configured
+    if (isBetterAuthConfigured()) {
+      try {
+        const profile = await getCurrentUserProfileBetterAuth();
+        if (profile) return profile;
+      } catch (betterAuthError) {
+        // Fall through to Supabase
+      }
     }
 
-    const { data: profile, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-    if (error || !profile) {
-      console.error('Error fetching profile:', error);
-      return null;
-    }
-
-    return {
-      id: profile.id,
-      email: profile.email,
-      name: profile.name,
-      walletAddress: profile.wallet_address,
-      walletSeedPhrase: profile.wallet_seed_phrase,
-      createdAt: profile.created_at,
-      accountType: profile.account_type,
-      role: profile.role,
-      phone: profile.phone,
-      bio: profile.bio,
-      profilePhoto: profile.profile_photo,
-      businessName: profile.business_name,
-      businessWebsite: profile.business_website,
-      industry: profile.industry,
-      socialLinks: profile.social_links,
-      emailVerified: profile.email_verified,
-      twoFactorEnabled: profile.two_factor_enabled
-    };
+    // Fallback to Supabase Auth
+    return await getCurrentUserProfileSupabase();
   } catch (error) {
-    console.error('Get current user error:', error);
     return null;
   }
 }
 
-/**
- * Subscribe to auth state changes
- */
 export function onAuthStateChange(callback: (user: UserProfile | null) => void) {
-  return supabase.auth.onAuthStateChange(async (event, session) => {
-    if (session?.user) {
-      const profile = await getCurrentUserProfile();
-      callback(profile);
-    } else {
-      callback(null);
-    }
+  // Use Supabase's real-time auth state changes (singleton client)
+  if (!supabase) {
+    callback(null);
+    return { unsubscribe: () => {} };
+  }
+
+  // Initial load
+  getCurrentUserProfile().then(callback);
+
+  // Subscribe to auth changes
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: any, _session: any) => {
+    const user = await getCurrentUserProfile();
+    callback(user);
   });
+
+  return { unsubscribe: () => subscription.unsubscribe() };
+}
+
+export async function resetPassword(email: string): Promise<{ success: boolean; error?: AuthError }> {
+  try {
+    if (!supabase) {
+      return { success: false, error: { message: 'Supabase client not initialized' } };
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) return { success: false, error: { message: error.message } };
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: { message: error.message } };
+  }
+}
+
+export async function updatePassword(newPassword: string): Promise<{ success: boolean; error?: AuthError }> {
+  try {
+    if (!supabase) {
+      return { success: false, error: { message: 'Supabase client not initialized' } };
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return { success: false, error: { message: error.message } };
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: { message: error.message } };
+  }
+}
+
+export async function getSession() {
+  try {
+    if (!supabase) return null;
+    const { data: { session } } = await supabase.auth.getSession();
+    return session;
+  } catch (error) {
+    return null;
+  }
 }

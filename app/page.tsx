@@ -8,6 +8,7 @@ import CertificateModal from '@/components/CertificateModal';
 import ProcessingOverlay from '@/components/ProcessingOverlay';
 import AuthModal from '@/components/AuthModal';
 import { onAuthStateChange, logout, generateUserWallet } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 import { UserProfile } from '@/types/user';
 
 export default function Home() {
@@ -51,6 +52,12 @@ export default function Home() {
 
   // Dashboard submenu state
   const [dashboardSection, setDashboardSection] = useState('overview');
+
+  // Sentinel AI monitoring state
+  const [sentinelData, setSentinelData] = useState<any>(null);
+  const [sentinelLoading, setSentinelLoading] = useState(false);
+  const [lastScanTime, setLastScanTime] = useState<string | null>(null);
+  const [sentinelHistory, setSentinelHistory] = useState<any[]>([]);
 
   // Wallet submenu state
   const [walletSection, setWalletSection] = useState('overview');
@@ -116,10 +123,7 @@ export default function Home() {
         try {
           const files = JSON.parse(savedFiles);
           setProtectedFiles(files);
-
-          // Load marketplace listings (filter files marked as listed)
-          const listedAssets = files.filter((file: any) => file.isListed);
-          setMarketplaceAssets(listedAssets);
+          // Marketplace listings are now loaded from database via API
         } catch (error) {
           console.error('Error loading protected files:', error);
         }
@@ -141,7 +145,7 @@ export default function Home() {
 
   // Auth state listener
   useEffect(() => {
-    const { data: { subscription } } = onAuthStateChange((user) => {
+    const subscription = onAuthStateChange((user) => {
       setCurrentUser(user);
       setIsLoggedIn(!!user);
       setAuthLoading(false);
@@ -176,6 +180,10 @@ export default function Home() {
 
         // Load 2FA status from user profile
         setTwoFactorEnabled(user.twoFactorEnabled);
+
+        // Load user's protected files from database
+        console.log('🔄 [Auth Change] User authenticated, loading protected files...');
+        loadProtectedFilesFromDB();
       } else {
         setUserWallet(null);
         setAuthLoading(false);
@@ -185,50 +193,147 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // PRESERVED: Supabase client initialization
-  const getSupabaseClient = () => {
-    if (typeof window === 'undefined') return null;
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.error('Supabase environment variables not set');
-      return null;
+  // Load marketplace listings when user navigates to marketplace
+  useEffect(() => {
+    if (currentPage === 'marketplace') {
+      loadMarketplaceListings();
     }
+  }, [currentPage]);
 
-    try {
-      if (typeof window !== 'undefined') {
-        const { createClient } = require('@supabase/supabase-js');
-        return createClient(supabaseUrl, supabaseKey);
+  // Sentinel AI monitoring - fetch scan data when monitoring tab is active
+  useEffect(() => {
+    const fetchSentinelData = async () => {
+      if (currentPage === 'dashboard' && dashboardSection === 'monitoring' && !sentinelLoading) {
+        setSentinelLoading(true);
+        try {
+          // Fetch current scan
+          const response = await fetch('/api/sentinel/scan');
+          const data = await response.json();
+
+          if (data.success) {
+            setSentinelData(data);
+            setLastScanTime(new Date().toLocaleTimeString());
+            console.log('🛡️ Sentinel scan data loaded:', data.sources_scanned.toLocaleString(), 'sources');
+          }
+
+          // Fetch scan history from database
+          const { data: historyData, error: historyError } = await supabase
+            .from('sentinel_scans')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+          if (!historyError && historyData) {
+            setSentinelHistory(historyData);
+            console.log('📊 Loaded', historyData.length, 'historical scans');
+          }
+        } catch (error) {
+          console.error('Failed to fetch Sentinel data:', error);
+        } finally {
+          setSentinelLoading(false);
+        }
       }
-      return null;
-    } catch (error) {
-      console.error('Failed to create Supabase client:', error);
-      return null;
-    }
-  };
+    };
+
+    fetchSentinelData();
+
+    // Auto-refresh every 5 minutes if monitoring tab is active
+    const interval = setInterval(() => {
+      if (currentPage === 'dashboard' && dashboardSection === 'monitoring') {
+        fetchSentinelData();
+      }
+    }, 300000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [currentPage, dashboardSection]);
 
   // PRESERVED: Hash generation function
+  // Generate perceptual hash for images (resistant to minor edits)
+  const generatePerceptualHash = async (file: File): Promise<string> => {
+    // Only generate perceptual hash for images
+    if (!file.type.startsWith('image/')) {
+      // For non-images, use a robust content-based hash
+      const arrayBuffer = await file.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return '0xC' + hashArray.slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      img.onload = () => {
+        try {
+          // Resize to 8x8 for perceptual hash (standard blockhash size)
+          const size = 8;
+          canvas.width = size;
+          canvas.height = size;
+
+          if (!ctx) {
+            reject(new Error('Canvas context not available'));
+            return;
+          }
+
+          // Draw image scaled down
+          ctx.drawImage(img, 0, 0, size, size);
+
+          // Get grayscale pixel data
+          const imageData = ctx.getImageData(0, 0, size, size);
+          const pixels = imageData.data;
+
+          // Convert to grayscale and calculate average
+          const grayscale: number[] = [];
+          for (let i = 0; i < pixels.length; i += 4) {
+            const gray = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+            grayscale.push(gray);
+          }
+
+          const average = grayscale.reduce((a, b) => a + b, 0) / grayscale.length;
+
+          // Create hash: 1 if pixel > average, 0 otherwise
+          let hash = '';
+          for (let i = 0; i < grayscale.length; i++) {
+            hash += grayscale[i] > average ? '1' : '0';
+          }
+
+          // Convert binary string to hex (perceptual hash)
+          const hexHash = BigInt('0b' + hash).toString(16).padStart(16, '0');
+          resolve('0xP' + hexHash);
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      img.onerror = () => reject(new Error('Failed to load image for perceptual hashing'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const generateHashes = async (file: File) => {
     try {
       const arrayBuffer = await file.arrayBuffer();
 
-      // Legal Hash (SHA-256)
+      // Legal Hash (SHA-256) - Binary fingerprint of exact file
       const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const legal = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-      // Content Hash (Perceptual)
-      const uint8Array = new Uint8Array(arrayBuffer);
-      let simpleSum = 0;
-      for (let i = 0; i < Math.min(uint8Array.length, 1000); i++) {
-        simpleSum += uint8Array[i];
-      }
-      const content = '0x' + (simpleSum % 10000000000000000).toString(16).padStart(16, '0');
+      // Content Hash (Perceptual) - Detects similar images even with minor edits
+      // For images: Uses 8x8 grayscale hash (like blockhash)
+      // For non-images: Uses truncated SHA-256 for content verification
+      const content = await generatePerceptualHash(file);
 
-      // Floral Hash (Visual) - This will be the Asset ID
+      // Floral Hash (Asset ID) - Human-readable deterministic identifier
       const floral = '🌸 BS-' + legal.substring(0, 4) + '-' + legal.substring(4, 8) + '-' + legal.substring(8, 12);
+
+      console.log('✅ Generated hashes:', {
+        legal: legal.substring(0, 16) + '...',
+        content: content,
+        floral: floral,
+        fileType: file.type
+      });
 
       return { legal, content, floral };
     } catch (error) {
@@ -242,9 +347,9 @@ export default function Home() {
     if (!fileToUpload) return;
 
     try {
-      const supabase = getSupabaseClient();
+      // Use singleton Supabase client (imported at top)
       if (!supabase) {
-        throw new Error('Failed to initialize Supabase client');
+        throw new Error('Supabase client not initialized');
       }
 
       // Show processing overlay
@@ -301,9 +406,43 @@ export default function Home() {
 
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Step 3: Upload to Supabase Storage
-      setUploadStatus('Uploading to secure storage...');
+      // Step 3: Pin to IPFS via Pinata
+      setUploadStatus('Pinning to IPFS network...');
       setProcessingStep(4);
+
+      let ipfsCid: string | null = null;
+      let ipfsUrl: string | null = null;
+
+      try {
+        const ipfsFormData = new FormData();
+        ipfsFormData.append('file', fileToUpload);
+        ipfsFormData.append('fileName', fileToUpload.name);
+        ipfsFormData.append('floralHash', hashes.floral);
+
+        const ipfsResponse = await fetch('/api/ipfs/upload', {
+          method: 'POST',
+          body: ipfsFormData
+        });
+
+        const ipfsResult = await ipfsResponse.json();
+
+        if (ipfsResult.success) {
+          ipfsCid = ipfsResult.ipfsCid;
+          ipfsUrl = ipfsResult.ipfsUrl;
+          console.log(`✅ File pinned to IPFS: ${ipfsCid}`);
+        } else {
+          console.warn('⚠️ IPFS upload skipped:', ipfsResult.error);
+        }
+      } catch (ipfsError) {
+        console.warn('⚠️ IPFS upload failed (non-critical):', ipfsError);
+        // Continue without IPFS - it's not critical for protection
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Step 4: Upload to Supabase Storage
+      setUploadStatus('Uploading to secure storage...');
+      setProcessingStep(5);
 
       const fileName = `${hashes.legal.slice(0, 16)}_${Date.now()}_${fileToUpload.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -314,20 +453,29 @@ export default function Home() {
         throw uploadError;
       }
 
-      // Step 4: Save to Database
+      // Step 5: Save to Database
       setUploadStatus('Saving protection record...');
+
+      // Get current user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       const { data: dbData, error: dbError} = await supabase
         .from('protected_files')
         .insert({
-          file_name: fileToUpload.name,
+          user_id: user.id,
+          name: fileToUpload.name,
           file_size: fileToUpload.size,
           mime_type: fileToUpload.type,
           storage_path: uploadData?.path || fileName,
           legal_hash: hashes.legal,
           content_hash: hashes.content,
-          floral_hash: hashes.floral,
+          floral_id: hashes.floral,
           blockchain_tx: blockchainTransactionHash,
           blockchain_timestamp: blockchainTimestamp,
+          ipfs_hash: ipfsCid, // ✅ Real IPFS CID from Pinata
         })
         .select()
         .single();
@@ -346,12 +494,7 @@ export default function Home() {
       const walletData = typeof window !== 'undefined' ? localStorage.getItem('userWallet') : null;
       const wallet = walletData ? JSON.parse(walletData) : null;
 
-      // Generate IPFS hash (simulated)
-      const ipfsHash = 'Qm' + Array.from({length: 44}, () =>
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 62)]
-      ).join('');
-
-      // Prepare certificate data with actual file information + blockchain info
+      // Prepare certificate data with actual file information + blockchain info + IPFS
       const certData = {
         assetId: hashes.floral,
         fileName: fileToUpload.name,
@@ -365,22 +508,14 @@ export default function Home() {
         floralHash: hashes.floral,
         blockchainTx: blockchainTransactionHash,
         ownerWallet: wallet?.address || 'No wallet',
-        ipfsHash: ipfsHash,
+        ipfsHash: ipfsCid || null, // ✅ Real IPFS CID from Pinata
+        ipfsUrl: ipfsUrl || null,  // ✅ Public gateway URL for verification
       };
       setCertificateData(certData);
 
-      // Save to localStorage for My Files section
-      if (typeof window !== 'undefined') {
-        try {
-          const savedFiles = localStorage.getItem('protectedFiles');
-          const filesArray = savedFiles ? JSON.parse(savedFiles) : [];
-          filesArray.unshift(certData); // Add new file to the beginning
-          localStorage.setItem('protectedFiles', JSON.stringify(filesArray));
-          setProtectedFiles(filesArray); // Update state
-        } catch (error) {
-          console.error('Error saving to localStorage:', error);
-        }
-      }
+      // Reload protected files from database
+      console.log('🔄 [File Upload] File uploaded, reloading protected files...');
+      await loadProtectedFilesFromDB();
 
       const successMessage = blockchainTransactionHash.startsWith('0xSIM')
         ? '✅ File protected successfully! ⚠️ Using simulated blockchain.'
@@ -550,56 +685,108 @@ export default function Home() {
   };
 
   // List asset on marketplace
-  const handleConfirmListing = (listingData: any) => {
+  const handleConfirmListing = async (listingData: any) => {
     if (!assetToList) return;
 
-    // Update the asset with listing information
-    const updatedAsset = {
-      ...assetToList,
-      isListed: true,
-      salePrice: listingData.salePrice,
-      allowLease: listingData.allowLease,
-      leasePrice1Month: listingData.leasePrice1Month,
-      leasePrice6Month: listingData.leasePrice6Month,
-      leasePrice1Year: listingData.leasePrice1Year,
-      commercialUse: listingData.commercialUse,
-      attribution: listingData.attribution,
-      resale: listingData.resale || false,
-      listedDate: new Date().toISOString()
-    };
+    try {
+      // Call API to list asset in database
+      const response = await fetch('/api/marketplace/list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          floralId: assetToList.assetId,
+          fileName: assetToList.fileName,
+          fileType: assetToList.fileType,
+          fileSize: assetToList.fileSize,
+          creatorName: assetToList.creator || currentUser?.name || 'Unknown',
+          creatorWallet: assetToList.creatorWallet || userWallet?.address || '0x0000000000000000000000000000000000000000',
+          legalHash: assetToList.legalHash,
+          ipfsHash: assetToList.ipfsHash,
+          blockchainTx: assetToList.blockchainTx,
+          blockNumber: assetToList.blockNumber,
+          salePrice: listingData.salePrice,
+          allowLease: listingData.allowLease,
+          leasePrice1Month: listingData.leasePrice1Month,
+          leasePrice6Month: listingData.leasePrice6Month,
+          leasePrice1Year: listingData.leasePrice1Year,
+          commercialUse: listingData.commercialUse,
+          attribution: listingData.attribution,
+          description: listingData.description || null
+        })
+      });
 
-    // Update protected files
-    const updatedFiles = protectedFiles.map(file =>
-      file.assetId === assetToList.assetId ? updatedAsset : file
-    );
+      const result = await response.json();
 
-    setProtectedFiles(updatedFiles);
-    localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to list asset');
+      }
 
-    // Update marketplace assets
-    const listedAssets = updatedFiles.filter(file => file.isListed);
-    setMarketplaceAssets(listedAssets);
+      // Update the asset with listing information locally
+      const updatedAsset = {
+        ...assetToList,
+        isListed: true,
+        salePrice: listingData.salePrice,
+        allowLease: listingData.allowLease,
+        leasePrice1Month: listingData.leasePrice1Month,
+        leasePrice6Month: listingData.leasePrice6Month,
+        leasePrice1Year: listingData.leasePrice1Year,
+        commercialUse: listingData.commercialUse,
+        attribution: listingData.attribution,
+        resale: listingData.resale || false,
+        listedDate: new Date().toISOString()
+      };
 
-    setShowListingModal(false);
-    setAssetToList(null);
+      // Update protected files
+      const updatedFiles = protectedFiles.map(file =>
+        file.assetId === assetToList.assetId ? updatedAsset : file
+      );
 
-    showToastMessage('✅ Asset listed on marketplace!', 'success');
+      setProtectedFiles(updatedFiles);
+      localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
+
+      // Refresh marketplace listings from database
+      await loadMarketplaceListings();
+
+      setShowListingModal(false);
+      setAssetToList(null);
+
+      showToastMessage('✅ Asset listed on marketplace!', 'success');
+    } catch (error) {
+      console.error('Error listing asset:', error);
+      showToastMessage(`❌ Failed to list asset: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
   };
 
   // Unlist asset from marketplace
-  const handleUnlistAsset = (assetId: string) => {
-    const updatedFiles = protectedFiles.map(file =>
-      file.assetId === assetId ? { ...file, isListed: false, salePrice: 0 } : file
-    );
+  const handleUnlistAsset = async (assetId: string) => {
+    try {
+      // Call API to unlist asset in database
+      const response = await fetch(`/api/marketplace/list?floralId=${encodeURIComponent(assetId)}`, {
+        method: 'DELETE'
+      });
 
-    setProtectedFiles(updatedFiles);
-    localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
+      const result = await response.json();
 
-    // Update marketplace assets
-    const listedAssets = updatedFiles.filter(file => file.isListed);
-    setMarketplaceAssets(listedAssets);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to unlist asset');
+      }
 
-    showToastMessage('✅ Asset removed from marketplace', 'success');
+      // Update local state
+      const updatedFiles = protectedFiles.map(file =>
+        file.assetId === assetId ? { ...file, isListed: false, salePrice: 0 } : file
+      );
+
+      setProtectedFiles(updatedFiles);
+      localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
+
+      // Refresh marketplace listings from database
+      await loadMarketplaceListings();
+
+      showToastMessage('✅ Asset removed from marketplace', 'success');
+    } catch (error) {
+      console.error('Error unlisting asset:', error);
+      showToastMessage(`❌ Failed to unlist asset: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
   };
 
   // View asset details
@@ -609,7 +796,7 @@ export default function Home() {
   };
 
   // Purchase asset
-  const handlePurchaseAsset = () => {
+  const handlePurchaseAsset = async () => {
     if (!selectedAsset || !currentUser) {
       showToastMessage('⚠️ Please log in to purchase', 'warning');
       return;
@@ -621,48 +808,81 @@ export default function Home() {
     }
 
     const confirmed = confirm(
-      `Purchase ${selectedAsset.fileName} for $${selectedAsset.salePrice}?\n\nThis will transfer ownership to you.`
+      `Purchase ${selectedAsset.fileName} for $${selectedAsset.salePrice}?\n\nThis will redirect you to checkout.`
     );
 
     if (!confirmed) return;
 
-    // Simulate purchase (in production, this would call blockchain + Stripe)
-    const purchaseTx = '0x' + Array.from({ length: 64 }, () =>
-      '0123456789abcdef'[Math.floor(Math.random() * 16)]
-    ).join('');
+    try {
+      // Call Polar checkout API
+      const response = await fetch('/api/polar/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assetId: selectedAsset.assetId,
+          assetName: selectedAsset.fileName,
+          assetType: 'sale',
+          amount: selectedAsset.salePrice,
+          sellerId: selectedAsset.creatorUid || selectedAsset.creator,
+          sellerWallet: selectedAsset.creatorWallet
+        })
+      });
 
-    // Update asset ownership
-    const updatedFiles = protectedFiles.map(file => {
-      if (file.assetId === selectedAsset.assetId) {
-        return {
-          ...file,
-          creator: currentUser.name,
-          creatorWallet: userWallet?.address,
-          isListed: false,
-          previousOwner: file.creator,
-          purchaseDate: new Date().toISOString(),
-          purchasePrice: file.salePrice,
-          purchaseTx: purchaseTx
-        };
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create checkout');
       }
-      return file;
-    });
 
-    setProtectedFiles(updatedFiles);
-    localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
+      // Redirect to checkout URL
+      if (result.checkoutUrl) {
+        if (result.simulated) {
+          // For simulated checkout, handle locally
+          showToastMessage('⚠️ Using simulated payment (Polar not configured)', 'warning');
 
-    // Update marketplace
-    const listedAssets = updatedFiles.filter(file => file.isListed);
-    setMarketplaceAssets(listedAssets);
+          // Simulate purchase locally
+          const purchaseTx = '0x' + Array.from({ length: 64 }, () =>
+            '0123456789abcdef'[Math.floor(Math.random() * 16)]
+          ).join('');
 
-    setShowAssetDetail(false);
-    setSelectedAsset(null);
+          const updatedFiles = protectedFiles.map(file => {
+            if (file.assetId === selectedAsset.assetId) {
+              return {
+                ...file,
+                creator: currentUser.name,
+                creatorWallet: userWallet?.address,
+                isListed: false,
+                previousOwner: file.creator,
+                purchaseDate: new Date().toISOString(),
+                purchasePrice: file.salePrice,
+                purchaseTx: purchaseTx
+              };
+            }
+            return file;
+          });
 
-    showToastMessage('✅ Purchase successful! Asset is now yours.', 'success');
+          setProtectedFiles(updatedFiles);
+          localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
+
+          await loadMarketplaceListings();
+
+          setShowAssetDetail(false);
+          setSelectedAsset(null);
+
+          showToastMessage('✅ Purchase successful! (Simulated)', 'success');
+        } else {
+          // Redirect to real Polar checkout
+          window.location.href = result.checkoutUrl;
+        }
+      }
+    } catch (error) {
+      console.error('Error creating checkout:', error);
+      showToastMessage(`❌ Purchase failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
   };
 
   // Lease asset
-  const handleLeaseAsset = (duration: string, price: number) => {
+  const handleLeaseAsset = async (duration: string, price: number) => {
     if (!selectedAsset || !currentUser) {
       showToastMessage('⚠️ Please log in to lease', 'warning');
       return;
@@ -674,115 +894,188 @@ export default function Home() {
     }
 
     const confirmed = confirm(
-      `Lease ${selectedAsset.fileName} for ${duration} at $${price}?`
+      `Lease ${selectedAsset.fileName} for ${duration} at $${price}?\n\nThis will redirect you to checkout.`
     );
 
     if (!confirmed) return;
 
-    // Simulate lease transaction
-    const leaseTx = '0x' + Array.from({ length: 64 }, () =>
-      '0123456789abcdef'[Math.floor(Math.random() * 16)]
-    ).join('');
+    try {
+      // Call Polar checkout API for lease
+      const response = await fetch('/api/polar/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assetId: selectedAsset.assetId,
+          assetName: selectedAsset.fileName,
+          assetType: 'lease',
+          amount: price,
+          sellerId: selectedAsset.creatorUid || selectedAsset.creator,
+          sellerWallet: selectedAsset.creatorWallet,
+          leaseDuration: duration
+        })
+      });
 
-    // Calculate end date
-    const durationDays = duration === '1 Month' ? 30 : duration === '6 Months' ? 180 : 365;
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + durationDays);
+      const result = await response.json();
 
-    // Store lease in localStorage
-    const leases = JSON.parse(localStorage.getItem('leases') || '[]');
-    leases.push({
-      assetId: selectedAsset.assetId,
-      assetName: selectedAsset.fileName,
-      lessee: currentUser.name,
-      lesseeWallet: userWallet?.address,
-      owner: selectedAsset.creator,
-      ownerWallet: selectedAsset.creatorWallet,
-      startDate: new Date().toISOString(),
-      endDate: endDate.toISOString(),
-      duration: duration,
-      price: price,
-      leaseTx: leaseTx,
-      active: true
-    });
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create checkout');
+      }
 
-    localStorage.setItem('leases', JSON.stringify(leases));
+      // Redirect to checkout URL
+      if (result.checkoutUrl) {
+        if (result.simulated) {
+          // For simulated checkout, handle locally
+          showToastMessage('⚠️ Using simulated payment (Polar not configured)', 'warning');
 
-    setShowAssetDetail(false);
-    setSelectedAsset(null);
+          // Simulate lease locally
+          const leaseTx = '0x' + Array.from({ length: 64 }, () =>
+            '0123456789abcdef'[Math.floor(Math.random() * 16)]
+          ).join('');
 
-    showToastMessage('✅ Lease created successfully!', 'success');
+          const durationDays = duration === '1 Month' ? 30 : duration === '6 Months' ? 180 : 365;
+          const endDate = new Date();
+          endDate.setDate(endDate.getDate() + durationDays);
+
+          const leases = JSON.parse(localStorage.getItem('leases') || '[]');
+          leases.push({
+            assetId: selectedAsset.assetId,
+            assetName: selectedAsset.fileName,
+            lessee: currentUser.name,
+            lesseeWallet: userWallet?.address,
+            owner: selectedAsset.creator,
+            ownerWallet: selectedAsset.creatorWallet,
+            startDate: new Date().toISOString(),
+            endDate: endDate.toISOString(),
+            duration: duration,
+            price: price,
+            leaseTx: leaseTx,
+            active: true
+          });
+
+          localStorage.setItem('leases', JSON.stringify(leases));
+
+          setShowAssetDetail(false);
+          setSelectedAsset(null);
+
+          showToastMessage('✅ Lease created successfully! (Simulated)', 'success');
+        } else {
+          // Redirect to real Polar checkout
+          window.location.href = result.checkoutUrl;
+        }
+      }
+    } catch (error) {
+      console.error('Error creating lease checkout:', error);
+      showToastMessage(`❌ Lease failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
+  };
+
+  // Load user's protected files from database
+  const loadProtectedFilesFromDB = async () => {
+    // Guard: Only fetch if user is logged in
+    if (!isLoggedIn || !currentUser) {
+      console.log('⚠️ Skipping file fetch - user not authenticated');
+      console.log('  isLoggedIn:', isLoggedIn);
+      console.log('  currentUser:', currentUser);
+      return;
+    }
+
+    console.log('🔄 Fetching protected files from database...');
+    console.log('  User:', currentUser?.email || 'Unknown');
+
+    try {
+      const response = await fetch('/api/files/protected');
+      console.log('📡 API Response status:', response.status, response.statusText);
+
+      const result = await response.json();
+      console.log('📦 API Response data:', result);
+      console.log('  success:', result.success);
+      console.log('  count:', result.count);
+      console.log('  files array length:', result.files?.length);
+
+      if (result.success) {
+        const filesArray = result.files || [];
+        console.log(`✅ Setting ${filesArray.length} files to state`);
+        setProtectedFiles(filesArray);
+        // Also update localStorage for backward compatibility
+        localStorage.setItem('protectedFiles', JSON.stringify(filesArray));
+        console.log(`✅ SUCCESS: Loaded ${result.count} protected files from database`);
+      } else {
+        console.error('❌ API returned success: false');
+        throw new Error(result.error || 'Failed to load protected files');
+      }
+    } catch (error) {
+      console.error('❌ Error loading protected files:', error);
+      // Fallback to localStorage if API fails
+      const savedFiles = localStorage.getItem('protectedFiles');
+      if (savedFiles) {
+        try {
+          const files = JSON.parse(savedFiles);
+          console.log(`⚠️ Fallback: Loading ${files.length} files from localStorage`);
+          setProtectedFiles(files);
+        } catch (e) {
+          console.error('Error parsing localStorage files:', e);
+        }
+      } else {
+        console.log('⚠️ No localStorage fallback available');
+      }
+    }
+  };
+
+  // Load marketplace listings from database
+  const loadMarketplaceListings = async () => {
+    try {
+      const params = new URLSearchParams();
+
+      if (marketplaceSearchQuery) {
+        params.append('search', marketplaceSearchQuery);
+      }
+
+      if (marketplaceFilters.type !== 'all') {
+        params.append('assetType', marketplaceFilters.type);
+      }
+
+      if (marketplaceFilters.license !== 'all') {
+        params.append('licenseType', marketplaceFilters.license);
+      }
+
+      // Parse price filter (e.g., "0-100", "100-500", "1000+")
+      if (marketplaceFilters.price !== 'all') {
+        const priceRange = marketplaceFilters.price;
+        if (priceRange.includes('+')) {
+          const minPrice = parseInt(priceRange.replace('+', ''));
+          params.append('minPrice', minPrice.toString());
+        } else if (priceRange.includes('-')) {
+          const [min, max] = priceRange.split('-').map(Number);
+          if (min) params.append('minPrice', min.toString());
+          if (max) params.append('maxPrice', max.toString());
+        }
+      }
+
+      params.append('sortBy', marketplaceFilters.sort);
+
+      const response = await fetch(`/api/marketplace/listings?${params.toString()}`);
+      const result = await response.json();
+
+      if (result.success) {
+        setMarketplaceAssets(result.listings || []);
+      } else {
+        throw new Error(result.error || 'Failed to load listings');
+      }
+    } catch (error) {
+      console.error('Error loading marketplace listings:', error);
+      showToastMessage(`❌ Failed to load marketplace: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
   };
 
   // Search marketplace
   const handleMarketplaceSearch = () => {
-    if (!marketplaceSearchQuery.trim()) {
-      // Reload all listings if search is empty
-      const listedAssets = protectedFiles.filter(file => file.isListed);
-      setMarketplaceAssets(listedAssets);
-      return;
-    }
-
-    const query = marketplaceSearchQuery.toLowerCase();
-    const results = protectedFiles.filter(file => {
-      if (!file.isListed) return false;
-
-      return (
-        file.fileName?.toLowerCase().includes(query) ||
-        file.creator?.toLowerCase().includes(query) ||
-        file.assetId?.toLowerCase().includes(query) ||
-        file.fileType?.toLowerCase().includes(query)
-      );
-    });
-
-    setMarketplaceAssets(results);
-
-    if (results.length === 0) {
-      showToastMessage(`No results found for "${marketplaceSearchQuery}"`, 'warning');
-    }
+    loadMarketplaceListings();
   };
 
   // Apply marketplace filters
   const handleApplyFilters = () => {
-    let filtered = protectedFiles.filter(file => file.isListed);
-
-    // Filter by type
-    if (marketplaceFilters.type !== 'all') {
-      filtered = filtered.filter(file =>
-        file.fileType?.toLowerCase().includes(marketplaceFilters.type)
-      );
-    }
-
-    // Filter by license
-    if (marketplaceFilters.license === 'sale') {
-      filtered = filtered.filter(file => file.salePrice > 0);
-    } else if (marketplaceFilters.license === 'lease') {
-      filtered = filtered.filter(file => file.allowLease);
-    }
-
-    // Filter by price
-    if (marketplaceFilters.price !== 'all') {
-      const [min, max] = marketplaceFilters.price.includes('+')
-        ? [1000, Infinity]
-        : marketplaceFilters.price.split('-').map(Number);
-
-      filtered = filtered.filter(file => {
-        const price = file.salePrice || 0;
-        return price >= min && price <= (max || Infinity);
-      });
-    }
-
-    // Sort
-    if (marketplaceFilters.sort === 'newest') {
-      filtered.sort((a, b) => new Date(b.protectedDate || 0).getTime() - new Date(a.protectedDate || 0).getTime());
-    } else if (marketplaceFilters.sort === 'price-low') {
-      filtered.sort((a, b) => (a.salePrice || 0) - (b.salePrice || 0));
-    } else if (marketplaceFilters.sort === 'price-high') {
-      filtered.sort((a, b) => (b.salePrice || 0) - (a.salePrice || 0));
-    }
-
-    setMarketplaceAssets(filtered);
-    showToastMessage(`Found ${filtered.length} assets`, 'success');
+    // Filters are now handled by the API in loadMarketplaceListings
+    loadMarketplaceListings();
   };
 
   // Handle navigation
@@ -805,6 +1098,7 @@ export default function Home() {
   // Handle navigate to dashboard from certificate
   const handleNavigateToDashboard = () => {
     setShowCertificate(false);
+    setCertificateData(null); // Clear data to prevent reopening
     if (!isLoggedIn) {
       handleLogin();
     } else {
@@ -1214,21 +1508,255 @@ export default function Home() {
                 </div>
               )}
 
-              {/* MONITORING SECTION */}
+              {/* MONITORING SECTION - SENTINEL AI */}
               {dashboardSection === 'monitoring' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Monitoring</h1>
-
-                  <div className="bg-[#FFB8A3] rounded-2xl p-12 text-center text-white shadow-lg">
-                    <h3 className="text-3xl font-bold mb-4">🔍 Unlock Advanced Monitoring</h3>
-                    <p className="text-xl mb-8 opacity-95">Track your content across the web and get alerts when copies are detected</p>
-                    <button
-                      onClick={handleUpgradeToPro}
-                      className="bg-white text-[#FF8C42] font-bold py-4 px-10 rounded-lg hover:shadow-xl transition-all text-lg"
-                    >
-                      Upgrade to Pro
-                    </button>
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h1 className="text-4xl font-bold text-gray-800">Sentinel AI Monitoring</h1>
+                      <p className="text-gray-500 mt-2">Real-time protection across millions of sources</p>
+                    </div>
+                    {lastScanTime && (
+                      <div className="text-sm text-gray-500 flex items-center gap-2">
+                        <span className="relative flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                        </span>
+                        Last scanned: {lastScanTime}
+                      </div>
+                    )}
                   </div>
+
+                  {sentinelLoading && !sentinelData ? (
+                    <div className="bg-white rounded-2xl p-12 text-center shadow-lg">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#FF8C42]"></div>
+                        <p className="text-gray-600 text-lg">Scanning millions of sources...</p>
+                      </div>
+                    </div>
+                  ) : sentinelData ? (
+                    <div>
+                      {/* Main Stats */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-8 text-white shadow-lg">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-semibold">Sources Monitored</h3>
+                            <span className="text-4xl">🛡️</span>
+                          </div>
+                          <div className="text-5xl font-bold mb-2">
+                            {sentinelLoading ? (
+                              <span className="animate-pulse">...</span>
+                            ) : (
+                              sentinelData.sources_scanned.toLocaleString()
+                            )}
+                          </div>
+                          <p className="text-green-100 text-sm">Continuously scanning</p>
+                        </div>
+
+                        <div className={`bg-gradient-to-br rounded-2xl p-8 text-white shadow-lg ${
+                          sentinelData.leaks_found > 0
+                            ? 'from-red-500 to-red-600'
+                            : 'from-emerald-500 to-emerald-600'
+                        }`}>
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-semibold">Data Leaks Found</h3>
+                            <span className="text-4xl">{sentinelData.leaks_found > 0 ? '⚠️' : '✅'}</span>
+                          </div>
+                          <div className="text-5xl font-bold mb-2">
+                            {sentinelData.leaks_found.toString().padStart(2, '0')}
+                          </div>
+                          <p className={sentinelData.leaks_found > 0 ? 'text-red-100 text-sm' : 'text-emerald-100 text-sm'}>
+                            {sentinelData.leaks_found > 0 ? 'Action required!' : 'You\'re secure!'}
+                          </p>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-8 text-white shadow-lg">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-semibold">Next Scan</h3>
+                            <span className="text-4xl">⏱️</span>
+                          </div>
+                          <div className="text-5xl font-bold mb-2">
+                            {Math.floor(sentinelData.next_scan_in / 60)}m
+                          </div>
+                          <p className="text-blue-100 text-sm">Auto-refresh enabled</p>
+                        </div>
+                      </div>
+
+                      {/* Coverage Breakdown */}
+                      <div className="bg-white rounded-2xl p-8 shadow-lg mb-8">
+                        <h3 className="text-2xl font-bold text-gray-800 mb-6">Coverage Breakdown</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                          <div className="text-center">
+                            <div className="text-3xl mb-2">📱</div>
+                            <div className="text-2xl font-bold text-gray-800">
+                              {sentinelData.scan_coverage.social_media.toLocaleString()}
+                            </div>
+                            <div className="text-sm text-gray-500 mt-1">Social Media</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-3xl mb-2">🕸️</div>
+                            <div className="text-2xl font-bold text-gray-800">
+                              {sentinelData.scan_coverage.dark_web.toLocaleString()}
+                            </div>
+                            <div className="text-sm text-gray-500 mt-1">Dark Web</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-3xl mb-2">📁</div>
+                            <div className="text-2xl font-bold text-gray-800">
+                              {sentinelData.scan_coverage.file_sharing.toLocaleString()}
+                            </div>
+                            <div className="text-sm text-gray-500 mt-1">File Sharing</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-3xl mb-2">💾</div>
+                            <div className="text-2xl font-bold text-gray-800">
+                              {sentinelData.scan_coverage.public_databases.toLocaleString()}
+                            </div>
+                            <div className="text-sm text-gray-500 mt-1">Public Databases</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Breach Alert (if any) */}
+                      {sentinelData.breach_details && (
+                        <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-8 mb-8">
+                          <div className="flex items-start gap-4">
+                            <span className="text-5xl">🚨</span>
+                            <div className="flex-1">
+                              <h3 className="text-2xl font-bold text-red-800 mb-2">Data Breach Detected</h3>
+                              <p className="text-red-700 mb-4">
+                                Your email <strong>{sentinelData.breach_details.email}</strong> was found in{' '}
+                                <strong>{sentinelData.breach_details.breach_count}</strong> data breach{sentinelData.breach_details.breach_count > 1 ? 'es' : ''}.
+                              </p>
+                              <div className="bg-white rounded-lg p-4">
+                                <p className="font-semibold text-gray-800 mb-2">Affected Services:</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {sentinelData.breach_details.breaches.map((breach: string, i: number) => (
+                                    <span key={i} className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-semibold">
+                                      {breach}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="mt-4">
+                                <button className="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-colors">
+                                  Secure My Account →
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Recent Scans */}
+                      <div className="bg-white rounded-2xl p-8 shadow-lg">
+                        <div className="flex items-center justify-between mb-6">
+                          <h3 className="text-2xl font-bold text-gray-800">Recent Scan Activity</h3>
+                          {sentinelLoading && (
+                            <span className="text-sm text-gray-500 flex items-center gap-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#FF8C42]"></div>
+                              Refreshing...
+                            </span>
+                          )}
+                        </div>
+                        <div className="space-y-3">
+                          {sentinelData.recent_scans.map((scan: any, index: number) => {
+                            const severityColors = {
+                              clean: { dot: 'bg-green-500', badge: 'bg-green-100 text-green-700' },
+                              medium: { dot: 'bg-yellow-500', badge: 'bg-yellow-100 text-yellow-700' },
+                              high: { dot: 'bg-orange-500', badge: 'bg-orange-100 text-orange-700' },
+                              critical: { dot: 'bg-red-500', badge: 'bg-red-100 text-red-700' }
+                            };
+
+                            const colors = severityColors[scan.severity as keyof typeof severityColors] || severityColors.clean;
+
+                            return (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className={`w-2 h-2 ${colors.dot} rounded-full`}></div>
+                                  <div>
+                                    <div className="font-semibold text-gray-800">{scan.source}</div>
+                                    <div className="text-sm text-gray-500">
+                                      {scan.scannedItems.toLocaleString()} items scanned
+                                    </div>
+                                    {scan.details && (
+                                      <div className="text-xs text-gray-600 mt-1">{scan.details}</div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className={`px-3 py-1 ${colors.badge} rounded-full text-sm font-semibold`}>
+                                    {scan.status}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-1">{scan.timestamp}</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Scan History from Database */}
+                      {sentinelHistory.length > 0 && (
+                        <div className="bg-white rounded-2xl p-8 shadow-lg mt-6">
+                          <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-2xl font-bold text-gray-800">Scan History</h3>
+                            <span className="text-sm text-gray-500">{sentinelHistory.length} recent scans</span>
+                          </div>
+                          <div className="space-y-3">
+                            {sentinelHistory.map((scan: any, index: number) => {
+                              const scanDate = new Date(scan.created_at);
+                              const timeAgo = Math.floor((Date.now() - scanDate.getTime()) / 1000 / 60); // minutes ago
+                              const displayTime = timeAgo < 60
+                                ? `${timeAgo} mins ago`
+                                : timeAgo < 1440
+                                ? `${Math.floor(timeAgo / 60)} hours ago`
+                                : `${Math.floor(timeAgo / 1440)} days ago`;
+
+                              const hasLeaks = scan.leaks_found > 0;
+
+                              return (
+                                <div
+                                  key={scan.id}
+                                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                                >
+                                  <div className="flex items-center gap-4">
+                                    <div className={`w-2 h-2 ${hasLeaks ? 'bg-red-500' : 'bg-green-500'} rounded-full`}></div>
+                                    <div>
+                                      <div className="font-semibold text-gray-800">
+                                        {scanDate.toLocaleString('en-US', {
+                                          month: 'short',
+                                          day: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        {scan.sources_scanned.toLocaleString()} sources scanned
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className={`px-3 py-1 ${hasLeaks ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'} rounded-full text-sm font-semibold`}>
+                                      {hasLeaks ? `${scan.leaks_found} Leaks Found` : 'Clean'}
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-1">{displayTime}</div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-2xl p-12 text-center shadow-lg">
+                      <p className="text-gray-500">Failed to load monitoring data. Please refresh.</p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2814,7 +3342,10 @@ export default function Home() {
       {certificateData && (
         <CertificateModal
           show={showCertificate}
-          onClose={() => setShowCertificate(false)}
+          onClose={() => {
+            setShowCertificate(false);
+            setCertificateData(null); // Clear data to prevent reopening
+          }}
           data={certificateData}
           onNavigateToDashboard={handleNavigateToDashboard}
         />
