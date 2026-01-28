@@ -927,7 +927,7 @@ export default function Home() {
             {/* Hero Image Background */}
             <div className="absolute inset-0">
               <img
-                src="/images/hero-vault.png"
+                src="/images/bloomshield-hero.png"
                 alt=""
                 className="w-full h-full object-cover object-center"
               />
