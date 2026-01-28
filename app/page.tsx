@@ -923,72 +923,192 @@ export default function Home() {
 
         {/* HOME PAGE */}
         {currentPage === 'home' && (
-          <div className="flex items-center justify-center min-h-[calc(100vh-80px)] p-4 md:p-8">
-            <div className="w-full max-w-6xl">
-              {/* Title */}
-              <div className="text-center mb-8 md:mb-12">
-                <h1 className="text-4xl md:text-6xl font-bold mb-4 text-[#FF8C42]">
-                  BloomShield
-                </h1>
-                <p className="text-lg md:text-xl text-gray-600 px-4">
-                  Protect and verify creative ownership on the blockchain
-                </p>
-              </div>
+          <div className="relative min-h-[calc(100vh-70px)] overflow-hidden flex flex-col">
+            {/* Sunset Sky Background */}
+            <div className="absolute inset-0" style={{
+              background: 'linear-gradient(180deg, #1a1a2e 0%, #2d1b4e 15%, #5c3d6e 30%, #b06a8f 45%, #d4917e 55%, #e8b89d 65%, #f0d0b8 75%, #f5e1d0 85%, #f9efe6 100%)'
+            }} />
+            {/* Cloud/haze overlay */}
+            <div className="absolute inset-0 opacity-30" style={{
+              background: 'radial-gradient(ellipse at 30% 50%, rgba(255,200,180,0.4) 0%, transparent 60%), radial-gradient(ellipse at 70% 40%, rgba(180,140,200,0.3) 0%, transparent 50%), radial-gradient(ellipse at 50% 80%, rgba(255,220,200,0.5) 0%, transparent 40%)'
+            }} />
 
-              {/* Two Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto px-4">
-                {/* Verify Card */}
-                <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1">
-                  <h3 className="text-xl font-bold text-gray-800 mb-3">🔍 Verify Content</h3>
-                  <p className="text-gray-600 mb-4 text-sm leading-relaxed">
-                    Search by Shield ID or creator name to verify authentic ownership
-                  </p>
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    placeholder="🌸 BS-a7f5-b3k9-c8m2"
-                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none transition-colors mb-4"
-                  />
-                  <button
-                    onClick={handleSearch}
-                    className="w-full bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-bold py-2.5 px-6 rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-lg"
-                  >
-                    SEARCH
-                  </button>
-                </div>
+            {/* Main Content Area */}
+            <div className="relative z-10 flex-1 flex items-center">
+              <div className="w-full max-w-7xl mx-auto px-6 md:px-12 lg:px-16">
+                <div className="flex flex-col md:flex-row items-center gap-8 md:gap-4">
 
-                {/* Upload Card */}
-                <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1">
-                  <h3 className="text-xl font-bold text-gray-800 mb-3">🛡️ Protect Your Work</h3>
-                  <p className="text-gray-600 mb-4 text-sm leading-relaxed">
-                    Upload files to generate blockchain certificates and secure your creative work
-                  </p>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-gray-300 hover:border-[#FF8C42] rounded-lg p-8 mb-4 cursor-pointer transition-all hover:bg-orange-50 text-center"
-                  >
-                    <div className="text-5xl mb-3">📁</div>
-                    <div className="text-gray-600 font-medium">
-                      {selectedFile
-                        ? `${selectedFile.name} (${(selectedFile.size / 1024 / 1024).toFixed(2)} MB)`
-                        : 'Click to choose files or drag & drop'
-                      }
+                  {/* Left - Hero Text */}
+                  <div className="flex-1 text-center md:text-left max-w-lg">
+                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6" style={{ textShadow: '0 2px 20px rgba(0,0,0,0.3)' }}>
+                      Protect Your Creative Work in 60 Seconds
+                    </h1>
+                    <p className="text-base md:text-lg text-white/80 leading-relaxed" style={{ textShadow: '0 1px 10px rgba(0,0,0,0.2)' }}>
+                      Blockchain verification trusted by 1,000+ creators.<br className="hidden md:block" />
+                      Beautiful protection for beautiful work.
+                    </p>
+                  </div>
+
+                  {/* Right - Vault Illustration */}
+                  <div className="flex-1 flex justify-center items-center relative">
+                    {/* Floating hexagons - decorative blockchain elements */}
+                    <div className="absolute -top-8 right-4 md:right-12 w-16 h-16 opacity-40 animate-pulse" style={{ animationDuration: '3s' }}>
+                      <svg viewBox="0 0 60 60" fill="none">
+                        <path d="M30 2L55 16V44L30 58L5 44V16L30 2Z" stroke="rgba(150,200,255,0.6)" strokeWidth="1.5" fill="rgba(150,200,255,0.08)" />
+                        <path d="M30 12L45 20V38L30 46L15 38V20L30 12Z" stroke="rgba(150,200,255,0.4)" strokeWidth="1" fill="none" />
+                      </svg>
+                    </div>
+                    <div className="absolute top-4 -right-2 md:right-0 w-12 h-12 opacity-30 animate-pulse" style={{ animationDuration: '4s', animationDelay: '1s' }}>
+                      <svg viewBox="0 0 60 60" fill="none">
+                        <path d="M30 5L52 18V42L30 55L8 42V18L30 5Z" stroke="rgba(180,160,255,0.6)" strokeWidth="1.5" fill="rgba(180,160,255,0.05)" />
+                      </svg>
+                    </div>
+                    <div className="absolute -top-4 left-8 md:left-16 w-10 h-10 opacity-25 animate-pulse" style={{ animationDuration: '5s', animationDelay: '2s' }}>
+                      <svg viewBox="0 0 60 60" fill="none">
+                        <path d="M30 2L55 16V44L30 58L5 44V16L30 2Z" stroke="rgba(100,220,255,0.5)" strokeWidth="1" fill="rgba(100,220,255,0.05)" />
+                      </svg>
+                    </div>
+                    <div className="absolute bottom-12 right-0 md:right-8 w-14 h-14 opacity-30 animate-pulse" style={{ animationDuration: '3.5s', animationDelay: '0.5s' }}>
+                      <svg viewBox="0 0 60 60" fill="none">
+                        <path d="M30 5L52 18V42L30 55L8 42V18L30 5Z" stroke="rgba(200,180,255,0.5)" strokeWidth="1" fill="rgba(200,180,255,0.06)" />
+                      </svg>
+                    </div>
+                    <div className="absolute bottom-20 left-4 md:left-12 w-10 h-10 opacity-20 animate-pulse" style={{ animationDuration: '4.5s', animationDelay: '1.5s' }}>
+                      <svg viewBox="0 0 60 60" fill="none">
+                        <path d="M30 2L55 16V44L30 58L5 44V16L30 2Z" stroke="rgba(150,200,255,0.5)" strokeWidth="1" fill="none" />
+                      </svg>
+                    </div>
+
+                    {/* Vault Circle */}
+                    <div className="relative w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96">
+                      {/* Outer glow */}
+                      <div className="absolute inset-0 rounded-full" style={{
+                        background: 'radial-gradient(circle, rgba(200,160,120,0.3) 0%, rgba(180,130,100,0.1) 50%, transparent 70%)',
+                        filter: 'blur(20px)',
+                        transform: 'scale(1.3)'
+                      }} />
+                      {/* Vault outer ring */}
+                      <div className="absolute inset-0 rounded-full" style={{
+                        background: 'conic-gradient(from 0deg, #8b6f5e, #a0826d, #c4a07a, #d4b48a, #c4a07a, #a0826d, #8b6f5e, #7a6050, #8b6f5e)',
+                        padding: '6px'
+                      }}>
+                        <div className="w-full h-full rounded-full" style={{
+                          background: 'radial-gradient(circle at 40% 35%, #c9a882, #a07858 40%, #7a5a42 70%, #5a3e2e 100%)'
+                        }}>
+                          {/* Vault details - bolts */}
+                          <div className="absolute top-4 left-1/2 -translate-x-1/2 w-3 h-3 md:w-4 md:h-4 rounded-full bg-gradient-to-br from-[#d4b48a] to-[#8b6f5e] shadow-inner" />
+                          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-3 h-3 md:w-4 md:h-4 rounded-full bg-gradient-to-br from-[#d4b48a] to-[#8b6f5e] shadow-inner" />
+                          <div className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 md:w-4 md:h-4 rounded-full bg-gradient-to-br from-[#d4b48a] to-[#8b6f5e] shadow-inner" />
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 w-3 h-3 md:w-4 md:h-4 rounded-full bg-gradient-to-br from-[#d4b48a] to-[#8b6f5e] shadow-inner" />
+                          {/* Diagonal bolts */}
+                          <div className="absolute top-[12%] left-[12%] w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-gradient-to-br from-[#d4b48a] to-[#8b6f5e] shadow-inner" />
+                          <div className="absolute top-[12%] right-[12%] w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-gradient-to-br from-[#d4b48a] to-[#8b6f5e] shadow-inner" />
+                          <div className="absolute bottom-[12%] left-[12%] w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-gradient-to-br from-[#d4b48a] to-[#8b6f5e] shadow-inner" />
+                          <div className="absolute bottom-[12%] right-[12%] w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-gradient-to-br from-[#d4b48a] to-[#8b6f5e] shadow-inner" />
+
+                          {/* Inner circle with flower */}
+                          <div className="absolute inset-[18%] rounded-full flex items-center justify-center" style={{
+                            background: 'radial-gradient(circle at 45% 40%, #e8d5c0, #c9a882 30%, #a08060 60%, #806040 100%)',
+                            boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.3), inset 0 -2px 10px rgba(255,255,255,0.1)'
+                          }}>
+                            {/* Flower SVG */}
+                            <svg viewBox="0 0 120 120" className="w-3/5 h-3/5 drop-shadow-lg" style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.3))' }}>
+                              {/* Leaves */}
+                              <ellipse cx="38" cy="85" rx="12" ry="6" fill="#4a7c5c" transform="rotate(-30 38 85)" opacity="0.9" />
+                              <ellipse cx="82" cy="85" rx="12" ry="6" fill="#3d6b4e" transform="rotate(30 82 85)" opacity="0.9" />
+                              <ellipse cx="30" cy="75" rx="10" ry="5" fill="#5a8c6c" transform="rotate(-45 30 75)" opacity="0.7" />
+                              {/* Outer petals */}
+                              <ellipse cx="60" cy="38" rx="14" ry="20" fill="#e8a0b8" transform="rotate(0 60 38)" />
+                              <ellipse cx="80" cy="48" rx="14" ry="20" fill="#d890a8" transform="rotate(72 80 48)" />
+                              <ellipse cx="75" cy="70" rx="14" ry="20" fill="#e8a0b8" transform="rotate(144 75 70)" />
+                              <ellipse cx="45" cy="70" rx="14" ry="20" fill="#d890a8" transform="rotate(216 45 70)" />
+                              <ellipse cx="40" cy="48" rx="14" ry="20" fill="#e8a0b8" transform="rotate(288 40 48)" />
+                              {/* Middle petals */}
+                              <ellipse cx="60" cy="45" rx="10" ry="15" fill="#d080a0" transform="rotate(36 60 45)" />
+                              <ellipse cx="72" cy="55" rx="10" ry="15" fill="#c878a0" transform="rotate(108 72 55)" />
+                              <ellipse cx="68" cy="68" rx="10" ry="15" fill="#d080a0" transform="rotate(180 68 68)" />
+                              <ellipse cx="52" cy="68" rx="10" ry="15" fill="#c878a0" transform="rotate(252 52 68)" />
+                              <ellipse cx="48" cy="55" rx="10" ry="15" fill="#d080a0" transform="rotate(324 48 55)" />
+                              {/* Inner petals - brighter */}
+                              <ellipse cx="60" cy="52" rx="6" ry="10" fill="#c06888" transform="rotate(18 60 52)" />
+                              <ellipse cx="66" cy="58" rx="6" ry="10" fill="#b86088" transform="rotate(90 66 58)" />
+                              <ellipse cx="63" cy="65" rx="6" ry="10" fill="#c06888" transform="rotate(162 63 65)" />
+                              <ellipse cx="57" cy="65" rx="6" ry="10" fill="#b86088" transform="rotate(234 57 65)" />
+                              <ellipse cx="54" cy="58" rx="6" ry="10" fill="#c06888" transform="rotate(306 54 58)" />
+                              {/* Center */}
+                              <circle cx="60" cy="58" r="6" fill="#a05078" />
+                              <circle cx="60" cy="58" r="3" fill="#884868" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-bold py-2.5 px-6 rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-lg"
-                  >
-                    CHOOSE FILES
-                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom CTA Bar */}
+            <div className="relative z-10 pb-6 px-4 md:px-12 lg:px-16">
+              <div className="max-w-3xl mx-auto">
+                {/* Upload CTA */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => {
+                    if (!isLoggedIn) {
+                      setShowLoginModal(true);
+                    } else {
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                  className="w-full group"
+                >
+                  <div className="bg-[#1a1a2e]/90 backdrop-blur-md rounded-2xl px-6 py-5 md:px-8 md:py-6 flex items-center gap-4 md:gap-5 border border-white/10 hover:border-white/20 transition-all hover:bg-[#1a1a2e]/95 shadow-2xl cursor-pointer">
+                    {/* Shield Icon */}
+                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 24 24" className="w-6 h-6 md:w-7 md:h-7 text-white" fill="currentColor">
+                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 2.18l7 3.12v4.7c0 4.83-3.13 9.37-7 10.5-3.87-1.13-7-5.67-7-10.5V6.3l7-3.12z" />
+                        <path d="M12 7l-4 2v3c0 2.5 1.7 4.8 4 5.5 2.3-.7 4-3 4-5.5V9l-4-2z" opacity="0.6" />
+                      </svg>
+                    </div>
+                    {/* Text */}
+                    <div className="text-left flex-1">
+                      <div className="text-white font-bold text-base md:text-lg">Protect Your Work</div>
+                      <div className="text-white/50 text-sm">
+                        {selectedFile
+                          ? `Selected: ${selectedFile.name} (${(selectedFile.size / 1024 / 1024).toFixed(2)} MB)`
+                          : 'Click to choose files or drag & drop. Your first 5 files are free.'
+                        }
+                      </div>
+                    </div>
+                    {/* Arrow */}
+                    <div className="text-white/30 group-hover:text-white/60 transition-colors shrink-0">
+                      <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M9 18l6-6-6-6" />
+                      </svg>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Trust badges */}
+                <div className="flex items-center justify-center gap-6 mt-4 text-white/50 text-xs md:text-sm">
+                  <span className="flex items-center gap-1.5">
+                    <svg viewBox="0 0 20 20" className="w-4 h-4 text-green-400/70" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    No credit card required
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <svg viewBox="0 0 20 20" className="w-4 h-4 text-green-400/70" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    Blockchain Verified
+                  </span>
                 </div>
               </div>
             </div>
