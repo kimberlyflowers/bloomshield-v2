@@ -929,7 +929,7 @@ export default function Home() {
               <img
                 src="/images/bloomshield-hero.png"
                 alt=""
-                className="w-full h-full object-cover object-center"
+                className="w-full h-full object-cover object-right"
               />
               {/* Left gradient overlay for text readability */}
               <div className="absolute inset-0" style={{
@@ -950,8 +950,6 @@ export default function Home() {
                   </h1>
                   <p className="text-base md:text-lg text-white/75 leading-relaxed max-w-md" style={{ textShadow: '0 1px 12px rgba(0,0,0,0.3)' }}>
                     Blockchain verification trusted by 1,000+ creators.
-                    <br />
-                    Beautiful protection for beautiful work.
                   </p>
                 </div>
               </div>
@@ -959,7 +957,7 @@ export default function Home() {
 
             {/* Bottom CTA Bar */}
             <div className="relative z-10 pb-8 px-4 md:px-12 lg:px-16">
-              <div className="max-w-2xl mx-auto lg:mx-0 lg:ml-12">
+              <div className="max-w-2xl mx-auto">
                 {/* Upload CTA */}
                 <input
                   type="file"
@@ -977,7 +975,7 @@ export default function Home() {
                   }}
                   className="w-full group"
                 >
-                  <div className="bg-[#1a1a2e]/85 backdrop-blur-lg rounded-2xl px-6 py-5 md:px-8 md:py-6 flex items-center gap-4 md:gap-5 border border-white/10 hover:border-white/25 transition-all hover:bg-[#1a1a2e]/95 shadow-2xl cursor-pointer">
+                  <div className="bg-[#1a1a2e]/80 backdrop-blur-lg rounded-2xl px-6 py-5 md:px-8 md:py-6 flex items-center gap-4 md:gap-5 border-2 border-dashed border-white/25 hover:border-white/40 transition-all hover:bg-[#1a1a2e]/90 shadow-2xl cursor-pointer">
                     {/* Shield Icon */}
                     <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-white/10 flex items-center justify-center shrink-0 border border-white/5">
                       <svg viewBox="0 0 24 24" className="w-6 h-6 md:w-7 md:h-7 text-white" fill="currentColor">
@@ -1005,7 +1003,7 @@ export default function Home() {
                 </button>
 
                 {/* Trust badges */}
-                <div className="flex items-center justify-center lg:justify-start gap-6 mt-4 text-white/45 text-xs md:text-sm">
+                <div className="flex items-center justify-center gap-6 mt-4 text-white/45 text-xs md:text-sm">
                   <span className="flex items-center gap-1.5">
                     <svg viewBox="0 0 20 20" className="w-4 h-4 text-green-400/60" fill="currentColor">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
