@@ -176,6 +176,60 @@ export default function Home() {
 
         // Load 2FA status from user profile
         setTwoFactorEnabled(user.twoFactorEnabled);
+
+        // Fetch protected files from Supabase database
+        const fetchProtectedFiles = async () => {
+          try {
+            const supabase = getSupabaseClient();
+            if (!supabase) return;
+
+            const { data, error } = await supabase
+              .from('protected_files')
+              .select('*')
+              .order('created_at', { ascending: false });
+
+            if (error) {
+              console.error('Error fetching protected files:', error);
+              return;
+            }
+
+            if (data && data.length > 0) {
+              // Map DB records to the format the UI expects
+              const files = data.map((record: any) => ({
+                assetId: record.floral_hash || record.floral_id || '',
+                fileName: record.file_name || record.name || '',
+                fileType: record.mime_type || record.file_type || 'Unknown',
+                fileSize: record.file_size ? `${(record.file_size / 1024 / 1024).toFixed(2)} MB` : 'Unknown',
+                protectedDate: record.created_at,
+                creator: user.name || 'Anonymous',
+                email: user.email || '',
+                legalHash: record.legal_hash || '',
+                contentHash: record.content_hash || '',
+                floralHash: record.floral_hash || '',
+                blockchainTx: record.blockchain_tx || record.blockchain_hash || '',
+                ownerWallet: user.walletAddress || 'No wallet',
+                ipfsHash: record.ipfs_hash || '',
+                storagePath: record.storage_path || '',
+                isListed: record.metadata?.isListed || false,
+                listingPrice: record.metadata?.listingPrice || '',
+                listingLicense: record.metadata?.listingLicense || '',
+                dbId: record.id,
+              }));
+
+              setProtectedFiles(files);
+              // Also update localStorage as cache
+              localStorage.setItem('protectedFiles', JSON.stringify(files));
+
+              // Load marketplace listings
+              const listedAssets = files.filter((file: any) => file.isListed);
+              setMarketplaceAssets(listedAssets);
+            }
+          } catch (err) {
+            console.error('Error fetching protected files:', err);
+          }
+        };
+        fetchProtectedFiles();
+
       } else {
         setUserWallet(null);
         setAuthLoading(false);
