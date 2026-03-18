@@ -125,7 +125,22 @@ export async function GET(request: Request) {
   const legalHash = searchParams.get('legalHash');
 
   try {
-    const provider = new ethers.providers.JsonRpcProvider(POLYGON_RPC);
+    // Connect to Polygon — try multiple RPCs for reliability
+    let provider: ethers.providers.JsonRpcProvider | null = null;
+    for (const rpc of POLYGON_RPCS) {
+      try {
+        const p = new ethers.providers.JsonRpcProvider(rpc);
+        await p.getNetwork();
+        provider = p;
+        break;
+      } catch (e) {
+        // try next RPC
+      }
+    }
+
+    if (!provider) {
+      throw new Error('Could not connect to any Polygon RPC');
+    }
 
     // If txHash provided, verify the transaction
     if (txHash) {
