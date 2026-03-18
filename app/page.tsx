@@ -479,13 +479,15 @@ export default function Home() {
       const { data: dbData, error: dbError} = await supabase
         .from('protected_files')
         .insert({
-          file_name: fileToUpload.name,
+          name: fileToUpload.name,
           file_size: fileToUpload.size,
+          file_type: fileToUpload.type,
           mime_type: fileToUpload.type,
           storage_path: uploadData?.path || fileName,
           legal_hash: hashes.legal,
           content_hash: hashes.content,
           floral_hash: hashes.floral,
+          floral_id: hashes.floral,
           blockchain_tx: blockchainTransactionHash,
           blockchain_hash: blockchainTransactionHash,
           blockchain_timestamp: blockchainTimestamp,

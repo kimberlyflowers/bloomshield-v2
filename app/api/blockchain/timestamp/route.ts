@@ -9,8 +9,13 @@ const CONTRACT_ABI = [
   'event TimestampCreated(string indexed legalHash, string contentHash, string floralHash, string ipfsHash, string fileName, uint256 timestamp, address creator)',
 ];
 
-// Polygon mainnet RPC (public, no API key needed)
-const POLYGON_RPC = 'https://polygon-rpc.com';
+// Polygon mainnet RPCs (fallback list for reliability)
+const POLYGON_RPCS = [
+  'https://polygon-bor-rpc.publicnode.com',
+  'https://polygon-rpc.com',
+  'https://rpc.ankr.com/polygon',
+  'https://polygon.llamarpc.com',
+];
 
 /**
  * POST /api/blockchain/timestamp
@@ -34,16 +39,42 @@ export async function POST(request: Request) {
       throw new Error('Contract address not configured');
     }
 
-    // Connect to Polygon
-    const provider = new ethers.providers.JsonRpcProvider(POLYGON_RPC);
+    // Connect to Polygon — try multiple RPCs for reliability
+    let provider: ethers.providers.JsonRpcProvider | null = null;
+    for (const rpc of POLYGON_RPCS) {
+      try {
+        const p = new ethers.providers.JsonRpcProvider(rpc);
+        await p.getNetwork(); // verify connection
+        provider = p;
+        console.log('📡 Connected via:', rpc);
+        break;
+      } catch (e) {
+        console.log('   RPC failed:', rpc);
+      }
+    }
+
+    if (!provider) {
+      throw new Error('Could not connect to any Polygon RPC');
+    }
+
     const wallet = new ethers.Wallet(privateKey, provider);
     const contract = new ethers.Contract(contractAddress, CONTRACT_ABI, wallet);
 
-    console.log('📡 Connected to Polygon. Wallet:', wallet.address);
+    console.log('👛 Wallet:', wallet.address);
+
+    // Get current gas prices — Polygon needs a minimum tip
+    const feeData = await provider.getFeeData();
+    const minTip = ethers.utils.parseUnits('30', 'gwei');
+    const tip = feeData.maxPriorityFeePerGas && feeData.maxPriorityFeePerGas.gt(minTip)
+      ? feeData.maxPriorityFeePerGas : minTip;
+    const maxFee = feeData.maxFeePerGas && feeData.maxFeePerGas.gt(ethers.utils.parseUnits('60', 'gwei'))
+      ? feeData.maxFeePerGas : ethers.utils.parseUnits('60', 'gwei');
 
     // Send transaction — all 5 hashes go on-chain
     const tx = await contract.createTimestamp(legalHash, contentHash, floralHash, ipfsHash, fileName, {
-      gasLimit: 300000, // Safe gas limit for this operation
+      gasLimit: 300000,
+      maxPriorityFeePerGas: tip,
+      maxFeePerGas: maxFee,
     });
 
     console.log('⏳ Transaction sent:', tx.hash, '— waiting for confirmation...');

@@ -12,8 +12,8 @@ export interface FileMetadata {
   fileType: string;
   fileSize: number;
   creator: string;
-  creatorEmail: string;
-  blockchainTx: string;
+  creatorEmail?: string;
+  blockchainTx?: string;
   timestamp: string;
   ipfsHash?: string;
 }
@@ -63,7 +63,7 @@ export async function pinMetadataToIPFS(metadata: FileMetadata): Promise<string>
             creator: metadata.creator,
             fileName: metadata.fileName,
             legalHash: metadata.legalHash,
-            blockchainTx: metadata.blockchainTx,
+            blockchainTx: metadata.blockchainTx || 'pending',
           },
         },
         pinataOptions: {

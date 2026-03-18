@@ -19,8 +19,6 @@ export async function POST(request: Request) {
       'fileType',
       'fileSize',
       'creator',
-      'creatorEmail',
-      'blockchainTx',
       'timestamp',
     ];
 
