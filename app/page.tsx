@@ -193,6 +193,76 @@ export default function Home() {
   };
 
   // PRESERVED: Hash generation function
+  // Helper function to compute dHash (difference hash) for images
+  const computeDHash = async (file: File): Promise<string> => {
+    try {
+      // Try to load as image
+      const arrayBuffer = await file.arrayBuffer();
+      const blob = new Blob([arrayBuffer], { type: file.type });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+
+      return new Promise((resolve, reject) => {
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 9;
+            canvas.height = 8;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('Could not get canvas context');
+
+            // Draw image on canvas (will be resized to 9x8)
+            ctx.drawImage(img, 0, 0, 9, 8);
+
+            // Get grayscale pixel data
+            const imageData = ctx.getImageData(0, 0, 9, 8);
+            const data = imageData.data;
+            const grayscale = [];
+
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
+              // Convert to grayscale using luminosity method
+              const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+              grayscale.push(gray);
+            }
+
+            // Compute difference hash (64-bit)
+            let hash = BigInt(0);
+            for (let i = 0; i < 64; i++) {
+              // Compare horizontally adjacent pixels
+              const row = Math.floor(i / 8);
+              const col = i % 8;
+              const idx = row * 9 + col;
+              if (idx + 1 < grayscale.length) {
+                const bit = grayscale[idx] > grayscale[idx + 1] ? 1 : 0;
+                hash |= BigInt(bit) << BigInt(i);
+              }
+            }
+
+            // Convert to 16-char hex string with 0x prefix
+            const hashHex = '0x' + hash.toString(16).padStart(16, '0');
+            URL.revokeObjectURL(url);
+            resolve(hashHex);
+          } catch (err) {
+            URL.revokeObjectURL(url);
+            reject(err);
+          }
+        };
+
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error('Failed to load image'));
+        };
+
+        img.src = url;
+      });
+    } catch (error) {
+      throw error;
+    }
+  };
+
   const generateHashes = async (file: File) => {
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -202,13 +272,30 @@ export default function Home() {
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const legal = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-      // Content Hash (Perceptual)
-      const uint8Array = new Uint8Array(arrayBuffer);
-      let simpleSum = 0;
-      for (let i = 0; i < Math.min(uint8Array.length, 1000); i++) {
-        simpleSum += uint8Array[i];
+      // Content Hash (Perceptual - dHash for images, SHA-256 for non-images)
+      let content: string;
+      const isImage = file.type.startsWith('image/');
+
+      if (isImage) {
+        try {
+          content = await computeDHash(file);
+        } catch (dHashError) {
+          console.warn('dHash computation failed, falling back to SHA-256:', dHashError);
+          // Fallback to SHA-256 of first 64KB for non-image or failed dHash
+          const firstChunk = arrayBuffer.slice(0, 65536);
+          const fallbackHash = await crypto.subtle.digest('SHA-256', firstChunk);
+          const fallbackArray = Array.from(new Uint8Array(fallbackHash));
+          const fallbackHex = fallbackArray.map(b => b.toString(16).padStart(2, '0')).join('');
+          content = '0x' + fallbackHex.substring(0, 16);
+        }
+      } else {
+        // For non-image files, use SHA-256 of first 64KB
+        const firstChunk = arrayBuffer.slice(0, 65536);
+        const fallbackHash = await crypto.subtle.digest('SHA-256', firstChunk);
+        const fallbackArray = Array.from(new Uint8Array(fallbackHash));
+        const fallbackHex = fallbackArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        content = '0x' + fallbackHex.substring(0, 16);
       }
-      const content = '0x' + (simpleSum % 10000000000000000).toString(16).padStart(16, '0');
 
       // Floral Hash (Visual) - This will be the Asset ID
       const floral = '🌸 BS-' + legal.substring(0, 4) + '-' + legal.substring(4, 8) + '-' + legal.substring(8, 12);
@@ -244,9 +331,44 @@ export default function Home() {
       setProcessingStep(2);
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Step 2: Blockchain Timestamp
-      setUploadStatus('⛓️ Creating blockchain timestamp...');
+      // Step 2: Pin metadata to IPFS via Pinata — gets Hash #4 (IPFS CID)
+      setUploadStatus('📌 Pinning to decentralized storage...');
       setProcessingStep(3);
+
+      let ipfsHash = '';
+      try {
+        const ipfsResponse = await fetch('/api/ipfs/pin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            legalHash: hashes.legal,
+            contentHash: hashes.content,
+            floralHash: hashes.floral,
+            fileName: fileToUpload.name,
+            fileType: fileToUpload.type,
+            fileSize: fileToUpload.size,
+            creator: currentUser?.name || 'Anonymous',
+            creatorEmail: currentUser?.email || 'no-email@bloomshield.local',
+            timestamp: new Date().toISOString(),
+          }),
+        });
+
+        const ipfsResult = await ipfsResponse.json();
+        if (ipfsResponse.ok && ipfsResult.success) {
+          ipfsHash = ipfsResult.ipfsHash;
+          console.log('✅ IPFS hash:', ipfsHash);
+        } else {
+          console.warn('IPFS pinning failed:', ipfsResult.error);
+        }
+      } catch (ipfsError) {
+        console.warn('IPFS pinning error:', ipfsError);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Step 3: Blockchain Timestamp — all 5 hashes go on-chain, gets Hash #5 (TX hash)
+      setUploadStatus('⛓️ Creating blockchain timestamp...');
+      setProcessingStep(4);
 
       let blockchainTransactionHash = '';
       let blockchainTimestamp = '';
@@ -259,9 +381,8 @@ export default function Home() {
             legalHash: hashes.legal,
             contentHash: hashes.content,
             floralHash: hashes.floral,
+            ipfsHash: ipfsHash || 'ipfs-unavailable',
             fileName: fileToUpload.name,
-            fileSize: fileToUpload.size,
-            mimeType: fileToUpload.type,
           }),
         });
 
@@ -276,7 +397,6 @@ export default function Home() {
         }
       } catch (blockchainError) {
         console.error('Blockchain call failed:', blockchainError);
-        // Fallback to simulated transaction
         blockchainTransactionHash = `0xSIM${Math.random().toString(16).substr(2, 60)}`;
         blockchainTimestamp = new Date().toISOString();
         setBlockchainTx(blockchainTransactionHash);
@@ -284,9 +404,9 @@ export default function Home() {
 
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Step 3: Upload to Supabase Storage
+      // Step 4: Upload to Supabase Storage
       setUploadStatus('Uploading to secure storage...');
-      setProcessingStep(4);
+      setProcessingStep(5);
 
       const fileName = `${hashes.legal.slice(0, 16)}_${Date.now()}_${fileToUpload.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -297,8 +417,11 @@ export default function Home() {
         throw uploadError;
       }
 
-      // Step 4: Save to Database
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Step 5: Save to Database — all 5 hashes + storage path
       setUploadStatus('Saving protection record...');
+      setProcessingStep(6);
       const { data: dbData, error: dbError} = await supabase
         .from('protected_files')
         .insert({
@@ -310,7 +433,9 @@ export default function Home() {
           content_hash: hashes.content,
           floral_hash: hashes.floral,
           blockchain_tx: blockchainTransactionHash,
+          blockchain_hash: blockchainTransactionHash,
           blockchain_timestamp: blockchainTimestamp,
+          ipfs_hash: ipfsHash,
         })
         .select()
         .single();
@@ -323,16 +448,11 @@ export default function Home() {
       setRecordId(dbData.id);
 
       await new Promise(resolve => setTimeout(resolve, 1500));
-      setProcessingStep(5);
+      setProcessingStep(7);
 
       // Get wallet info
       const walletData = typeof window !== 'undefined' ? localStorage.getItem('userWallet') : null;
       const wallet = walletData ? JSON.parse(walletData) : null;
-
-      // Generate IPFS hash (simulated)
-      const ipfsHash = 'Qm' + Array.from({length: 44}, () =>
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 62)]
-      ).join('');
 
       // Prepare certificate data with actual file information + blockchain info
       const certData = {
@@ -341,8 +461,8 @@ export default function Home() {
         fileType: fileToUpload.type || 'Unknown',
         fileSize: `${(fileToUpload.size / 1024 / 1024).toFixed(2)} MB`,
         protectedDate: new Date().toISOString(),
-        creator: 'User', // This would come from auth in production
-        email: 'user@example.com', // This would come from auth in production
+        creator: currentUser?.name || 'Anonymous',
+        email: currentUser?.email || 'no-email@bloomshield.local',
         legalHash: hashes.legal,
         contentHash: hashes.content,
         floralHash: hashes.floral,
