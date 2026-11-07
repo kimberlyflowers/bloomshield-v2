@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 interface CertificateData {
   assetId: string;
@@ -16,6 +17,7 @@ interface CertificateData {
   blockchainTx: string;
   ownerWallet?: string;
   ipfsHash?: string;
+  storagePath?: string;
 }
 
 interface CertificateModalProps {
@@ -27,11 +29,14 @@ interface CertificateModalProps {
 
 export default function CertificateModal({ show, onClose, data, onNavigateToDashboard }: CertificateModalProps) {
   const [verifiedTransaction, setVerifiedTransaction] = useState('');
+  const [downloadError, setDownloadError] = useState('');
+  const [downloading, setDownloading] = useState(false);
   const tx = data.blockchainTx || '';
   const verified = !!tx && verifiedTransaction === `${tx}:${data.legalHash}`;
 
   useEffect(() => {
     setVerifiedTransaction('');
+    setDownloadError('');
     if (!show || !/^0x[a-f0-9]{64}$/i.test(tx) || !/^[a-f0-9]{64}$/i.test(data.legalHash)) return;
     const controller = new AbortController();
     const params = new URLSearchParams({ txHash: tx, legalHash: data.legalHash });
@@ -91,6 +96,27 @@ Verification: ${verificationUrl || 'No confirmed Polygon timestamp'}
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleFileDownload = async () => {
+    if (!data.storagePath) return;
+    setDownloading(true);
+    setDownloadError('');
+    try {
+      const { data: file, error } = await getSupabaseBrowserClient()
+        .storage.from('protected-files').download(data.storagePath);
+      if (error || !file) throw new Error('The original file is unavailable to this workspace.');
+      const url = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = data.fileName;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : 'Could not download the file.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const handleShare = async () => {
@@ -293,6 +319,16 @@ Thank you!`
           </div>
         </div>
 
+        {data.storagePath && (
+          <div className="px-6 pt-4">
+            <button type="button" onClick={handleFileDownload} disabled={downloading}
+              className="rounded-lg border border-orange-300 px-4 py-2 text-sm font-semibold text-gray-800">
+              {downloading ? 'Downloading…' : 'Download original file'}
+            </button>
+            {downloadError && <p role="alert" className="mt-2 text-sm text-red-700">{downloadError}</p>}
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="grid grid-cols-3 gap-4 p-6 bg-transparent">
           <button
@@ -300,7 +336,7 @@ Thank you!`
             className="bg-white/95 backdrop-blur-md border-2 border-white/30 hover:border-[#FF8C42] hover:bg-white p-4 rounded-lg transition-all hover:-translate-y-1 hover:shadow-lg flex flex-col items-center gap-2"
           >
             <div className="text-3xl text-[#FF8C42]">⬇</div>
-            <div className="text-sm font-semibold text-gray-800">Download</div>
+            <div className="text-sm font-semibold text-gray-800">Download certificate</div>
           </button>
           <button
             onClick={handleShare}
