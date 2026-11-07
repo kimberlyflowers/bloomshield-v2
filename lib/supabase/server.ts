@@ -44,7 +44,8 @@ export async function getServerUser() {
     return null;
   }
 
-  return user;
+  const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  return !assuranceError && assurance && !(assurance.nextLevel === 'aal2' && assurance.currentLevel !== 'aal2') ? user : null;
 }
 
 /**

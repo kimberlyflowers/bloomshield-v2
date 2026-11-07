@@ -15,7 +15,7 @@ export function createClient() {
 // Singleton instance for client-side usage - lazy loaded
 let browserClient: ReturnType<typeof createBrowserClient> | null = null;
 
-export function getSupabaseBrowserClient() {
+export function getSupabaseBrowserClient(): ReturnType<typeof createBrowserClient> {
   // Only create client in browser environment
   if (typeof window === 'undefined') {
     // Return a dummy client for SSR/build time that will be replaced on client

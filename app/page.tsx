@@ -2,6 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
+import BillingPlans from '@/components/BillingPlans';
+import SecuritySettings from '@/components/SecuritySettings';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import TopBar from '@/components/TopBar';
 import WorkspaceIcon from '@/components/WorkspaceIcon';
 import Toast from '@/components/Toast';
@@ -36,6 +39,8 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const hasSession = useRef(false);
+  const fileOwner = useRef<string | null>(null);
+  const uploadInProgress = useRef(false);
 
   // Page navigation state
   const [currentPage, setCurrentPage] = useState('home');
@@ -82,7 +87,6 @@ export default function Home() {
 
   // Profile page state
   const [profileEditMode, setProfileEditMode] = useState(false);
-  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [profileData, setProfileData] = useState({
     fullName: 'Sarah Johnson',
     email: 'sarah@example.com',
@@ -113,7 +117,6 @@ export default function Home() {
   const [seedPhraseAcknowledged, setSeedPhraseAcknowledged] = useState(false);
   const [userWallet, setUserWallet] = useState<any>(null);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [show2FASetup, setShow2FASetup] = useState(false);
   const [apiKeys, setApiKeys] = useState<any[]>([]);
 
   // Marketplace state
@@ -133,25 +136,9 @@ export default function Home() {
   // Load protected files and marketplace assets from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedFiles = localStorage.getItem('protectedFiles');
-      if (savedFiles) {
-        try {
-          const files = JSON.parse(savedFiles);
-          setProtectedFiles(files);
-
-          // Load marketplace listings (filter files marked as listed)
-          const listedAssets = files.filter((file: any) => file.isListed);
-          setMarketplaceAssets(listedAssets);
-        } catch (error) {
-          console.error('Error loading protected files:', error);
-        }
-      }
-
-      // Load 2FA status
-      const twoFA = localStorage.getItem('twoFactorEnabled');
-      if (twoFA === 'true') {
-        setTwoFactorEnabled(true);
-      }
+      localStorage.removeItem('protectedFiles');
+      localStorage.removeItem('userPassword');
+      localStorage.removeItem('twoFactorEnabled');
 
       // Load API keys
       const keys = localStorage.getItem('apiKeys');
@@ -163,7 +150,29 @@ export default function Home() {
 
   // Auth state listener
   useEffect(() => {
+    let sequence = 0;
     const { data: { subscription } } = onAuthStateChange((user) => {
+      const event = ++sequence;
+      setTimeout(async () => {
+        if (user) {
+          const { data, error } = await getSupabaseBrowserClient().auth.mfa.getAuthenticatorAssuranceLevel();
+          if (event !== sequence || error || !data) return;
+          if (data.nextLevel === 'aal2' && data.currentLevel !== 'aal2') {
+            window.location.replace('/auth/mfa');
+            return;
+          }
+        }
+        if (event === sequence) applyUser(user);
+      }, 0);
+    });
+    function applyUser(user: UserProfile | null) {
+      if (fileOwner.current !== (user?.id ?? null)) {
+        fileOwner.current = user?.id ?? null;
+        setProtectedFiles([]);
+        setMarketplaceAssets([]);
+        setCertificateData(null);
+        setShowCertificate(false);
+      }
       setCurrentUser(user);
       setIsLoggedIn(!!user);
       if (user && !hasSession.current) setCurrentPage('dashboard');
@@ -209,6 +218,7 @@ export default function Home() {
             const { data, error } = await supabase
               .from('protected_files')
               .select('*')
+              .eq('user_id', user.id)
               .order('created_at', { ascending: false });
 
             if (error) {
@@ -216,7 +226,7 @@ export default function Home() {
               return;
             }
 
-            if (data && data.length > 0) {
+            if (data && fileOwner.current === user.id) {
               // Map DB records to the format the UI expects
               const files = data.map((record: any) => ({
                 assetId: record.floral_hash || record.floral_id || '',
@@ -240,8 +250,6 @@ export default function Home() {
               }));
 
               setProtectedFiles(files);
-              // Also update localStorage as cache
-              localStorage.setItem('protectedFiles', JSON.stringify(files));
 
               // Load marketplace listings
               const listedAssets = files.filter((file: any) => file.isListed);
@@ -258,9 +266,9 @@ export default function Home() {
         setCurrentPage('home');
         setIsSidebarActive(false);
       }
-    });
+    }
 
-    return () => subscription.unsubscribe();
+    return () => { sequence++; subscription.unsubscribe(); };
   }, []);
 
   // Supabase client initialization - uses SSR-compatible client
@@ -387,15 +395,23 @@ export default function Home() {
 
   // PRESERVED: Upload handler with UI enhancements - accepts file directly
   const handleUploadWithFile = async (fileToUpload: File) => {
-    if (!fileToUpload) return;
+    if (!fileToUpload || !currentUser || uploadInProgress.current) return;
+    const user = currentUser;
+    uploadInProgress.current = true;
+
 
     try {
       const supabase = getSupabaseClient();
-      if (!supabase) {
-        throw new Error('Failed to initialize Supabase client');
+      if (!supabase) throw new Error('File storage is unavailable.');
+      const { data: plan, error: planError } = await supabase.rpc('bloomshield_plan');
+      if (planError || !plan) throw new Error('Could not check this workspace’s upload limit.');
+      if (plan.limit !== null && plan.used >= plan.limit) {
+        throw new Error('Monthly asset limit reached. See Workspace billing for plan options.');
       }
 
       // Show processing overlay
+      setShowCertificate(false);
+      setCertificateData(null);
       setShowProcessing(true);
       setProcessingStep(1);
 
@@ -407,95 +423,53 @@ export default function Home() {
       setFloralHash(hashes.floral);
 
       setProcessingStep(2);
-      await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Step 2: Pin metadata to IPFS via Pinata — gets Hash #4 (IPFS CID)
       setUploadStatus('📌 Pinning to decentralized storage...');
       setProcessingStep(3);
 
-      let ipfsHash = '';
-      try {
-        const ipfsResponse = await fetch('/api/ipfs/pin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            legalHash: hashes.legal,
-            contentHash: hashes.content,
-            floralHash: hashes.floral,
-            fileName: fileToUpload.name,
-            fileType: fileToUpload.type,
-            fileSize: fileToUpload.size,
-            creator: currentUser?.name || 'Anonymous',
-            creatorEmail: currentUser?.email || 'no-email@bloomshield.local',
-            timestamp: new Date().toISOString(),
-          }),
-        });
-
-        const ipfsResult = await ipfsResponse.json();
-        if (ipfsResponse.ok && ipfsResult.success) {
-          ipfsHash = ipfsResult.ipfsHash;
-          console.log('✅ IPFS hash:', ipfsHash);
-        } else {
-          console.warn('IPFS pinning failed:', ipfsResult.error);
-        }
-      } catch (ipfsError) {
-        console.warn('IPFS pinning error:', ipfsError);
+      const pinResponse = await fetch('/api/ipfs/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ legalHash: hashes.legal, contentHash: hashes.content, floralHash: hashes.floral }),
+      });
+      const pin = await pinResponse.json();
+      if (!pinResponse.ok || !pin.ipfsHash) {
+        throw new Error('Metadata storage is unavailable. Please try again.');
       }
+      const ipfsHash: string = pin.ipfsHash;
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Step 3: Blockchain Timestamp — all 5 hashes go on-chain, gets Hash #5 (TX hash)
-      setUploadStatus('⛓️ Creating blockchain timestamp...');
       setProcessingStep(4);
-
-      let blockchainTransactionHash = '';
-      let blockchainTimestamp = '';
-
-      try {
-        const response = await fetch('/api/blockchain/timestamp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            legalHash: hashes.legal,
-            contentHash: hashes.content,
-            floralHash: hashes.floral,
-            ipfsHash: ipfsHash || 'ipfs-unavailable',
-            fileName: fileToUpload.name,
-          }),
-        });
-
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-          blockchainTransactionHash = result.blockchain.transactionHash;
-          blockchainTimestamp = new Date(result.blockchain.timestamp).toISOString();
-          setBlockchainTx(blockchainTransactionHash);
-        } else {
-          throw new Error(result.error || 'Blockchain API failed');
-        }
-      } catch (blockchainError) {
-        console.error('Blockchain call failed:', blockchainError);
-        blockchainTransactionHash = `0xSIM${Math.random().toString(16).substr(2, 60)}`;
-        blockchainTimestamp = new Date().toISOString();
-        setBlockchainTx(blockchainTransactionHash);
+      const response = await fetch('/api/blockchain/timestamp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          legalHash: hashes.legal,
+          contentHash: hashes.content,
+          floralHash: hashes.floral,
+          ipfsHash,
+        }),
+      });
+      const result = await response.json();
+      const blockchainTransactionHash = result.blockchain?.transactionHash;
+      if (!response.ok || !/^0x[0-9a-f]{64}$/i.test(blockchainTransactionHash ?? '')) {
+        throw new Error('Polygon could not confirm the timestamp. No certificate was issued.');
       }
-
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const blockchainTimestamp = new Date(result.blockchain.timestamp).toISOString();
 
       // Step 4: Upload to Supabase Storage
       setUploadStatus('Uploading to secure storage...');
       setProcessingStep(5);
 
-      const fileName = `${hashes.legal.slice(0, 16)}_${Date.now()}_${fileToUpload.name}`;
+      const fileName = `${user.id}/${crypto.randomUUID()}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('protected-files')
         .upload(fileName, fileToUpload);
 
-      if (uploadError && !uploadError.message.includes('already exists')) {
+      if (uploadError) {
         throw uploadError;
       }
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Step 5: Save to Database — all 5 hashes + storage path
       setUploadStatus('Saving protection record...');
@@ -503,6 +477,7 @@ export default function Home() {
       const { data: dbData, error: dbError} = await supabase
         .from('protected_files')
         .insert({
+          user_id: user.id,
           name: fileToUpload.name,
           file_size: fileToUpload.size,
           file_type: fileToUpload.type,
@@ -521,18 +496,13 @@ export default function Home() {
         .single();
 
       if (dbError) {
+        await supabase.storage.from('protected-files').remove([fileName]);
         console.error('Database error:', dbError);
         throw new Error(`Database error: ${dbError.message || 'Failed to save protection record'}`);
       }
 
       setRecordId(dbData.id);
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setProcessingStep(7);
-
-      // Get wallet info
-      const walletData = typeof window !== 'undefined' ? localStorage.getItem('userWallet') : null;
-      const wallet = walletData ? JSON.parse(walletData) : null;
 
       // Prepare certificate data with actual file information + blockchain info
       const certData = {
@@ -547,38 +517,24 @@ export default function Home() {
         contentHash: hashes.content,
         floralHash: hashes.floral,
         blockchainTx: blockchainTransactionHash,
-        ownerWallet: wallet?.address || 'No wallet',
+        ownerWallet: user.walletAddress,
+        storagePath: uploadData?.path || fileName,
         ipfsHash: ipfsHash,
       };
-      setCertificateData(certData);
-
-      // Save to localStorage for My Files section
-      if (typeof window !== 'undefined') {
-        try {
-          const savedFiles = localStorage.getItem('protectedFiles');
-          const filesArray = savedFiles ? JSON.parse(savedFiles) : [];
-          filesArray.unshift(certData); // Add new file to the beginning
-          localStorage.setItem('protectedFiles', JSON.stringify(filesArray));
-          setProtectedFiles(filesArray); // Update state
-        } catch (error) {
-          console.error('Error saving to localStorage:', error);
-        }
+      if (fileOwner.current === user.id) {
+        setCertificateData(certData);
+        setProtectedFiles(files => [certData, ...files]);
+        setShowCertificate(true);
+        showToastMessage('File stored and Polygon timestamp confirmed.', 'success');
       }
-
-      const successMessage = blockchainTransactionHash.startsWith('0xSIM')
-        ? '✅ File protected successfully! ⚠️ Using simulated blockchain.'
-        : '✅ File protected and stored successfully! ⛓️ Blockchain timestamp created!';
-
-      setUploadStatus(successMessage);
-
-      // Show toast
-      showToastMessage('🎉 Your work is now protected!', 'success');
 
     } catch (error) {
       console.error('Upload error:', error);
-      setUploadStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      showToastMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      showToastMessage(error instanceof Error ? error.message : 'File protection failed.', 'error');
+    } finally {
+      uploadInProgress.current = false;
       setShowProcessing(false);
+      setProcessingStep(0);
     }
   };
 
@@ -681,8 +637,7 @@ export default function Home() {
   // Handle successful login
   const handleLoginSuccess = (user: UserProfile) => {
     // Update app state with logged in user
-    setCurrentUser(user);
-    setIsLoggedIn(true);
+    // The auth listener applies the session after checking MFA assurance.
 
     // Set wallet from user profile
     if (user.walletAddress) {
@@ -698,7 +653,7 @@ export default function Home() {
     // Check if user needs to see seed phrase modal
     if (typeof window !== 'undefined') {
       const seedPhraseAck = localStorage.getItem('seedPhraseAcknowledged');
-      if (!seedPhraseAck) {
+      if (user.walletSeedPhrase && !seedPhraseAck) {
         setTimeout(() => setShowSeedPhraseModal(true), 1000);
       }
     }
@@ -757,7 +712,6 @@ export default function Home() {
     );
 
     setProtectedFiles(updatedFiles);
-    localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
 
     // Update marketplace assets
     const listedAssets = updatedFiles.filter(file => file.isListed);
@@ -776,7 +730,6 @@ export default function Home() {
     );
 
     setProtectedFiles(updatedFiles);
-    localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
 
     // Update marketplace assets
     const listedAssets = updatedFiles.filter(file => file.isListed);
@@ -832,7 +785,6 @@ export default function Home() {
     });
 
     setProtectedFiles(updatedFiles);
-    localStorage.setItem('protectedFiles', JSON.stringify(updatedFiles));
 
     // Update marketplace
     const listedAssets = updatedFiles.filter(file => file.isListed);
@@ -979,12 +931,6 @@ export default function Home() {
     setIsSidebarActive(!isSidebarActive);
   };
 
-  // Handle processing complete
-  const handleProcessingComplete = () => {
-    setShowProcessing(false);
-    setShowCertificate(true);
-  };
-
   // Handle navigate to dashboard from certificate
   const handleNavigateToDashboard = () => {
     setShowCertificate(false);
@@ -1010,7 +956,8 @@ export default function Home() {
 
   // Handle upgrade to pro
   const handleUpgradeToPro = () => {
-    alert('✨ Upgrade to BloomShield Pro\n\nPro features include:\n• Advanced content monitoring across the web\n• Case management for infringement\n• Priority support\n• Unlimited file protection\n\nContact sales@bloomshield.com for pricing.');
+    setSettingsSection('billing');
+    setCurrentPage('settings');
   };
 
   // Handle create listing
@@ -1054,17 +1001,8 @@ export default function Home() {
   };
 
   const handleChangePassword = () => {
-    setShowChangePasswordModal(true);
-  };
-
-  const handlePasswordModalClose = () => {
-    setShowChangePasswordModal(false);
-  };
-
-  const handlePasswordChange = () => {
-    // In real app: validate and submit password change
-    showToastMessage('✅ Password changed successfully!', 'success');
-    setShowChangePasswordModal(false);
+    setSettingsSection('security');
+    setCurrentPage('settings');
   };
 
   const handleAccountAction = (action: string) => {
@@ -1197,7 +1135,7 @@ export default function Home() {
                       <div className="text-white/45 text-sm truncate">
                         {selectedFile
                           ? `Selected: ${selectedFile.name} (${(selectedFile.size / 1024 / 1024).toFixed(2)} MB)`
-                          : 'Click to choose files or drag & drop. Your first 5 files are free.'
+                          : 'Click to choose files or drag & drop. The Free plan includes 3 assets per month.'
                         }
                       </div>
                     </div>
@@ -2184,55 +2122,9 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Subscription/Account Tier */}
-            <div className="workspace-card p-8 mb-6">
-              <h2 className="text-2xl font-bold text-workspace-text mb-6">Subscription</h2>
-              {profileData.accountType === 'free' ? (
-                <>
-                  <div className="mb-6">
-                    <div className="text-lg font-semibold text-workspace-text mb-4">Current Plan: Free</div>
-                    <div className="space-y-2">
-                      <div className="flex items-center text-workspace-muted">
-                        <span className="text-green-500 mr-2">✓</span> Unlimited file protection
-                      </div>
-                      <div className="flex items-center text-workspace-muted">
-                        <span className="text-green-500 mr-2">✓</span> Certificate generation
-                      </div>
-                      <div className="flex items-center text-workspace-muted">
-                        <span className="text-workspace-muted mr-2">✗</span> Advanced monitoring
-                      </div>
-                      <div className="flex items-center text-workspace-muted">
-                        <span className="text-workspace-muted mr-2">✗</span> Case management
-                      </div>
-                      <div className="flex items-center text-workspace-muted">
-                        <span className="text-workspace-muted mr-2">✗</span> Priority support
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleUpgradeToPro}
-                    className="w-full bg-[#FF8C42]  text-white font-bold py-3 px-6 rounded-lg transition-all hover:shadow-lg"
-                  >
-                    Upgrade to Pro →
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div className="mb-6">
-                    <div className="text-lg font-semibold text-workspace-text mb-2">Current Plan: Pro</div>
-                    <div className="text-workspace-muted mb-1">Billing: $29/month</div>
-                    <div className="text-workspace-muted">Next billing date: Dec 15, 2025</div>
-                  </div>
-                  <div className="flex gap-4">
-                    <button className="flex-1 bg-workspace-panel border-2 border-workspace-accent text-workspace-accent hover:bg-workspace-highlight font-semibold py-3 px-6 rounded-lg transition-all">
-                      Manage Subscription
-                    </button>
-                    <button className="flex-1 bg-workspace-panel border-2 border-workspace-border text-workspace-muted hover:bg-workspace-field font-semibold py-3 px-6 rounded-lg transition-all">
-                      View Invoices
-                    </button>
-                  </div>
-                </>
-              )}
+            <div className="workspace-card p-6">
+              <h2 className="mb-3 text-xl font-bold">Workspace plan</h2>
+              <button className="workspace-action rounded-lg px-4 py-2" onClick={handleUpgradeToPro}>View billing and usage</button>
             </div>
           </div>
         )}
@@ -2408,135 +2300,7 @@ export default function Home() {
                   <h1 className="text-2xl font-bold text-workspace-text mb-4">Security</h1>
                   <p className="text-workspace-muted mb-8">Manage your account security and authentication</p>
 
-                  {/* Password Card */}
-                  <div className="workspace-card p-6 mb-6">
-                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Password</h3>
-                    <p className="text-workspace-muted mb-4">Update your password regularly to keep your account secure</p>
-                    <button
-                      onClick={() => {
-                        const newPassword = prompt('Enter new password (minimum 8 characters):');
-                        if (newPassword && newPassword.length >= 8) {
-                          localStorage.setItem('userPassword', newPassword);
-                          showToastMessage('✅ Password updated successfully!', 'success');
-                        } else if (newPassword) {
-                          showToastMessage('⚠️ Password must be at least 8 characters', 'warning');
-                        }
-                      }}
-                      className="workspace-action px-6 py-2 rounded-lg  transition-all"
-                    >
-                      Change Password
-                    </button>
-                  </div>
-
-                  {/* 2FA Card */}
-                  <div className="workspace-card p-6 mb-6">
-                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Two-Factor Authentication</h3>
-                    <div className="flex justify-between items-center mb-4">
-                      <div>
-                        <p className="text-workspace-text font-semibold">
-                          Status: {twoFactorEnabled ? (
-                            <span className="text-emerald-300">✓ Enabled</span>
-                          ) : (
-                            <span className="text-workspace-muted">Not enabled</span>
-                          )}
-                        </p>
-                        <p className="text-workspace-muted text-sm mt-1">
-                          Add an extra layer of security to your account
-                        </p>
-                      </div>
-                      {twoFactorEnabled ? (
-                        <button
-                          onClick={() => {
-                            const confirmed = confirm('Are you sure you want to disable 2FA?');
-                            if (confirmed) {
-                              setTwoFactorEnabled(false);
-                              setShow2FASetup(false);
-                              localStorage.setItem('twoFactorEnabled', 'false');
-                              showToastMessage('🔓 Two-factor authentication disabled', 'success');
-                            }
-                          }}
-                          className="bg-workspace-panel border-2 border-workspace-border text-workspace-muted px-6 py-2 rounded-lg hover:bg-workspace-field transition-all"
-                        >
-                          Disable 2FA
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setShow2FASetup(!show2FASetup)}
-                          className="workspace-action px-6 py-2 rounded-lg  transition-all"
-                        >
-                          Enable 2FA
-                        </button>
-                      )}
-                    </div>
-
-                    {/* 2FA Setup UI */}
-                    {show2FASetup && !twoFactorEnabled && (
-                      <div className="border-t pt-4 mt-4">
-                        <h4 className="font-semibold text-workspace-text mb-4">Set Up Authenticator App</h4>
-                        <ol className="text-sm text-workspace-text space-y-2 mb-4">
-                          <li>1. Download an authenticator app (Google Authenticator, Authy, etc.)</li>
-                          <li>2. Scan this QR code with your app:</li>
-                        </ol>
-                        <div className="bg-workspace-field p-8 rounded-lg text-center mb-4">
-                          <div className="text-6xl">📱</div>
-                          <p className="text-sm text-workspace-muted mt-2">QR Code Placeholder</p>
-                          <p className="text-xs text-workspace-muted mt-1">In production: Display actual QR code</p>
-                        </div>
-                        <div className="bg-workspace-field p-4 rounded-lg mb-4">
-                          <p className="text-xs text-workspace-muted mb-2">Or enter this code manually:</p>
-                          <code className="text-sm font-mono text-workspace-text">ABCD-EFGH-IJKL-MNOP</code>
-                        </div>
-                        <div className="mb-4">
-                          <label className="block text-sm text-workspace-text mb-2">Enter 6-digit code from your app:</label>
-                          <input
-                            type="text"
-                            maxLength={6}
-                            placeholder="000000"
-                            className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none"
-                            id="twoFactorCode"
-                          />
-                        </div>
-                        <button
-                          onClick={() => {
-                            const code = (document.getElementById('twoFactorCode') as HTMLInputElement)?.value;
-                            if (code && code.length === 6) {
-                              setTwoFactorEnabled(true);
-                              setShow2FASetup(false);
-                              localStorage.setItem('twoFactorEnabled', 'true');
-                              showToastMessage('✅ Two-factor authentication enabled!', 'success');
-                            } else {
-                              showToastMessage('⚠️ Please enter a 6-digit code', 'warning');
-                            }
-                          }}
-                          className="w-full workspace-action py-3 rounded-lg  transition-all font-semibold"
-                        >
-                          Verify & Enable 2FA
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Sessions Card */}
-                  <div className="workspace-card p-6">
-                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Active Sessions</h3>
-                    <div className="bg-workspace-field p-4 rounded-lg mb-4">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-semibold text-workspace-text">Current Session</p>
-                          <p className="text-sm text-workspace-muted">Chrome on Windows • Last active: Now</p>
-                        </div>
-                        <span className="text-emerald-300 text-sm">● Active</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        showToastMessage('🔐 All other sessions signed out', 'success');
-                      }}
-                      className="w-full bg-workspace-panel border-2 border-workspace-accent text-workspace-accent py-2 rounded-lg hover:bg-workspace-highlight transition-all"
-                    >
-                      Sign Out All Other Sessions
-                    </button>
-                  </div>
+                  <SecuritySettings email={currentUser?.email ?? ''} />
                 </div>
               )}
 
@@ -2641,21 +2405,7 @@ export default function Home() {
               )}
 
               {/* BILLING SECTION */}
-              {settingsSection === 'billing' && (
-                <div>
-                  <h1 className="text-2xl font-bold text-workspace-text mb-8">Billing & Subscription</h1>
-                  <div className="workspace-card p-6 mb-6">
-                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Current Plan</h3>
-                    <p className="text-workspace-muted mb-4">Manage your subscription and billing information</p>
-                    <button
-                      onClick={() => setCurrentPage('wallet')}
-                      className="workspace-action px-6 py-2 rounded-lg  transition-all"
-                    >
-                      Go to Wallet →
-                    </button>
-                  </div>
-                </div>
-              )}
+              {settingsSection === 'billing' && <BillingPlans />}
 
               {/* DATA & EXPORT SECTION */}
               {settingsSection === 'data' && (
@@ -2674,7 +2424,7 @@ export default function Home() {
                           wallet: JSON.parse(localStorage.getItem('userWallet') || '{}'),
                           files: JSON.parse(localStorage.getItem('protectedFiles') || '[]'),
                           settings: {
-                            twoFactorEnabled: localStorage.getItem('twoFactorEnabled'),
+                            twoFactorEnabled,
                             notifications: Object.keys(localStorage).filter(k => k.startsWith('notification_')),
                             privacy: Object.keys(localStorage).filter(k => k.startsWith('privacy_'))
                           },
@@ -2783,26 +2533,22 @@ export default function Home() {
                     </div>
 
                     <p className="text-workspace-text mb-4">
-                      This will permanently delete your account, profile data, and remove access to the BloomShield platform.
+                      This permanently deletes your account, file records, and private files owned by this account. Blockchain timestamps and previously published IPFS metadata remain.
                       This action cannot be undone.
                     </p>
                     <button
-                      onClick={() => {
-                        const confirmation = prompt('Type "DELETE" in capital letters to confirm account deletion:');
-                        if (confirmation === 'DELETE') {
-                          const finalConfirm = confirm(
-                            '⚠️ FINAL WARNING\n\n' +
-                            'This will permanently delete your account.\n\n' +
-                            'Your blockchain records will remain, but you will lose access to this account.\n\n' +
-                            'Click OK to proceed with deletion.'
-                          );
-                          if (finalConfirm) {
-                            localStorage.clear();
-                            showToastMessage('🗑️ Account deleted. Reloading...', 'success');
-                            setTimeout(() => window.location.reload(), 2000);
-                          }
-                        } else if (confirmation !== null) {
-                          showToastMessage('⚠️ Deletion cancelled - you must type DELETE exactly', 'warning');
+                      onClick={async () => {
+                        if (prompt('Type DELETE to permanently remove your account and the files it owns.') !== 'DELETE') return;
+                        try {
+                          const response = await fetch('/api/account/delete', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ confirm: 'DELETE' }),
+                          });
+                          if (!response.ok) throw new Error((await response.json()).error);
+                          await getSupabaseBrowserClient().auth.signOut({ scope: 'local' });
+                          window.location.replace('/');
+                        } catch (error) {
+                          showToastMessage(error instanceof Error ? error.message : 'Account deletion failed.', 'error');
                         }
                       }}
                       className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-all font-semibold"
@@ -2822,7 +2568,6 @@ export default function Home() {
       <ProcessingOverlay
         show={showProcessing}
         currentStep={processingStep}
-        onComplete={handleProcessingComplete}
       />
 
       {/* Auth Modal (Login/Signup/Reset) */}
@@ -2832,61 +2577,6 @@ export default function Home() {
         onLoginSuccess={handleLoginSuccess}
         onSignUpSuccess={handleSignUpSuccess}
       />
-
-      {/* Change Password Modal */}
-      {showChangePasswordModal && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[2000] animate-fadeIn"
-          onClick={handlePasswordModalClose}
-        >
-          <div
-            className="bg-workspace-panel w-[90%] max-w-md rounded-2xl p-8 shadow-2xl animate-slideUp"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-2xl font-bold text-workspace-text mb-6">Change Password</h2>
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-sm text-workspace-muted mb-1">Current Password</label>
-                <input
-                  type="password"
-                  placeholder="Enter current password"
-                  className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-workspace-muted mb-1">New Password</label>
-                <input
-                  type="password"
-                  placeholder="Enter new password"
-                  className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-workspace-muted mb-1">Confirm New Password</label>
-                <input
-                  type="password"
-                  placeholder="Confirm new password"
-                  className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={handlePasswordModalClose}
-                className="flex-1 px-4 py-2 border-2 border-workspace-border text-workspace-muted rounded-lg hover:bg-workspace-field transition-all font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handlePasswordChange}
-                className="flex-1 px-4 py-2 workspace-action rounded-lg  transition-all font-semibold"
-              >
-                Change Password
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Seed Phrase Modal - Shows on first login */}
       {showSeedPhraseModal && userWallet && (

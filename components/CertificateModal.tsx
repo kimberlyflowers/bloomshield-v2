@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
 interface CertificateData {
   assetId: string;
   fileName: string;
@@ -24,7 +26,28 @@ interface CertificateModalProps {
 }
 
 export default function CertificateModal({ show, onClose, data, onNavigateToDashboard }: CertificateModalProps) {
+  const [verifiedTransaction, setVerifiedTransaction] = useState('');
+  const tx = data.blockchainTx || '';
+  const verified = !!tx && verifiedTransaction === `${tx}:${data.legalHash}`;
+
+  useEffect(() => {
+    setVerifiedTransaction('');
+    if (!show || !/^0x[a-f0-9]{64}$/i.test(tx) || !/^[a-f0-9]{64}$/i.test(data.legalHash)) return;
+    const controller = new AbortController();
+    const params = new URLSearchParams({ txHash: tx, legalHash: data.legalHash });
+    fetch(`/api/blockchain/timestamp?${params}`, { signal: controller.signal })
+      .then(response => response.ok ? response.json() : null)
+      .then(result => {
+        if (result?.verification?.matchesFile && !controller.signal.aborted) {
+          setVerifiedTransaction(`${tx}:${data.legalHash}`);
+        }
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [show, tx, data.legalHash]);
+
   if (!show) return null;
+  const verificationUrl = verified ? `https://polygonscan.com/tx/${tx}` : '';
 
   const handleDownload = () => {
     // Create a text file with certificate details
@@ -53,11 +76,10 @@ BLOCKCHAIN VERIFICATION
 -----------------------
 Transaction: ${data.blockchainTx}
 
-AUTHENTICITY VERIFIED ✓
-This work is timestamped and authenticated on the blockchain.
+${verified ? 'POLYGON TIMESTAMP VERIFIED' : 'POLYGON TIMESTAMP UNVERIFIED'}
 Protected by BloomShield 🌸
 
-For verification, visit: https://bloomshield.com/verify/${data.assetId.replace('🌸 ', '')}
+Verification: ${verificationUrl || 'No confirmed Polygon timestamp'}
 `;
 
     const blob = new Blob([certificateText], { type: 'text/plain' });
@@ -72,7 +94,8 @@ For verification, visit: https://bloomshield.com/verify/${data.assetId.replace('
   };
 
   const handleShare = async () => {
-    const shareUrl = `https://bloomshield.com/verify/${data.assetId.replace('🌸 ', '')}`;
+    if (!verificationUrl) return;
+    const shareUrl = verificationUrl;
     try {
       await navigator.clipboard.writeText(shareUrl);
       alert('✓ Certificate link copied to clipboard!\n\n' + shareUrl);
@@ -124,10 +147,10 @@ Thank you!`
           }}
         >
           <div className="inline-block bg-white text-[#FF8C42] px-6 py-2 rounded-full font-bold text-sm mb-4">
-            ✓ BLOOMSHIELD PROTECTED
+            {verified ? '✓ POLYGON TIMESTAMP VERIFIED' : 'POLYGON TIMESTAMP UNVERIFIED'}
           </div>
           <h1 className="text-3xl font-bold mb-2">Certificate of Protection</h1>
-          <p className="text-base opacity-95">This work is timestamped and authenticated</p>
+          <p className="text-base opacity-95">{verified ? 'The timestamp matches this file on Polygon.' : 'BloomShield could not confirm a Polygon timestamp for this file.'}</p>
           <p className="text-sm opacity-90 mt-2">
             Unauthorized reproduction, use, or distribution without creator consent or official licensing agreement may result in legal action
           </p>
@@ -237,17 +260,17 @@ Thank you!`
                   </div>
                 )}
               </div>
-              <div className="bg-[#E8F5E9] border-l-4 border-green-500 p-4 rounded-lg mt-4">
+              {verified && <div className="bg-[#E8F5E9] border-l-4 border-green-500 p-4 rounded-lg mt-4">
                 <p className="text-sm font-semibold text-gray-800 mb-1">✓ Permanent Protection</p>
                 <p className="text-xs text-gray-700">
-                  This proof exists on the blockchain forever, independent of BloomShield.
+                  This proof exists on the blockchain independent of BloomShield.
                 </p>
-              </div>
+              </div>}
             </div>
           )}
 
           {/* Protection Stamp */}
-          <div
+          {verified && <div
             className="text-center p-6 rounded-xl border-2"
             style={{
               background: 'linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%)',
@@ -260,6 +283,8 @@ Thank you!`
               Blockchain TX: {data.blockchainTx.slice(0, 20)}...
             </div>
           </div>
+
+          }
 
           {/* BloomShield Branding */}
           <div className="text-center pt-6 border-t-2 border-gray-200 mt-6">
@@ -279,6 +304,7 @@ Thank you!`
           </button>
           <button
             onClick={handleShare}
+            disabled={!verified}
             className="bg-white/95 backdrop-blur-md border-2 border-white/30 hover:border-[#FF8C42] hover:bg-white p-4 rounded-lg transition-all hover:-translate-y-1 hover:shadow-lg flex flex-col items-center gap-2"
           >
             <div className="text-3xl text-[#FF8C42]">⎙</div>

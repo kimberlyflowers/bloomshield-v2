@@ -1,52 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
-interface ProcessingStep {
-  icon: string;
-  text: string;
-  status: 'pending' | 'active' | 'complete';
-}
+const steps = [
+  { icon: '📄', text: 'Analyzing file' },
+  { icon: '🌸', text: 'Generating asset ID' },
+  { icon: '📌', text: 'Storing hash metadata' },
+  { icon: '⏰', text: 'Confirming Polygon timestamp' },
+  { icon: '🛡️', text: 'Saving private file' },
+  { icon: '✓', text: 'Saving protection record' },
+];
 
 interface ProcessingOverlayProps {
   show: boolean;
   currentStep: number;
-  onComplete?: () => void;
 }
 
-export default function ProcessingOverlay({ show, currentStep, onComplete }: ProcessingOverlayProps) {
-  const [steps, setSteps] = useState<ProcessingStep[]>([
-    { icon: '📄', text: 'Analyzing file', status: 'pending' },
-    { icon: '🌸', text: 'Generating Asset ID', status: 'pending' },
-    { icon: '⏰', text: 'Creating timestamp', status: 'pending' },
-    { icon: '✓', text: 'Finalizing protection', status: 'pending' },
-  ]);
-
-  const [showSuccess, setShowSuccess] = useState(false);
-
-  useEffect(() => {
-    setSteps((prevSteps) =>
-      prevSteps.map((step, index) => {
-        if (index < currentStep - 1) {
-          return { ...step, status: 'complete' };
-        } else if (index === currentStep - 1) {
-          return { ...step, status: 'active' };
-        } else {
-          return { ...step, status: 'pending' };
-        }
-      })
-    );
-
-    if (currentStep > 4) {
-      setShowSuccess(true);
-      if (onComplete) {
-        setTimeout(() => {
-          onComplete();
-        }, 1500);
-      }
-    }
-  }, [currentStep, onComplete]);
-
+export default function ProcessingOverlay({ show, currentStep }: ProcessingOverlayProps) {
   if (!show) return null;
 
   return (
@@ -61,9 +29,9 @@ export default function ProcessingOverlay({ show, currentStep, onComplete }: Pro
             <div
               key={index}
               className={`flex items-center p-4 rounded-lg transition-all ${
-                step.status === 'active'
+                index + 1 === currentStep
                   ? 'bg-gradient-to-r from-orange-50 to-pink-50 border-l-4 border-[#FF8C42]'
-                  : step.status === 'complete'
+                  : index + 1 < currentStep
                   ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500'
                   : 'bg-gray-50'
               }`}
@@ -71,9 +39,9 @@ export default function ProcessingOverlay({ show, currentStep, onComplete }: Pro
               <div className="text-2xl mr-4 w-8 text-center">{step.icon}</div>
               <div className="flex-1 font-medium text-gray-800">{step.text}</div>
               <div className="text-xl">
-                {step.status === 'complete' ? (
+                {index + 1 < currentStep ? (
                   '✓'
-                ) : step.status === 'active' ? (
+                ) : index + 1 === currentStep ? (
                   <span className="animate-spin inline-block">⟳</span>
                 ) : (
                   '⏳'
@@ -83,17 +51,6 @@ export default function ProcessingOverlay({ show, currentStep, onComplete }: Pro
           ))}
         </div>
 
-        {showSuccess && (
-          <div
-            className="p-8 rounded-xl animate-slideUp"
-            style={{
-              background: 'linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%)',
-            }}
-          >
-            <div className="text-5xl mb-4">🎉</div>
-            <div className="text-xl font-bold text-green-800">Your work is now protected!</div>
-          </div>
-        )}
       </div>
     </div>
   );

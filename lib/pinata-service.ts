@@ -8,14 +8,7 @@ export interface FileMetadata {
   legalHash: string;
   contentHash: string;
   floralHash: string;
-  fileName: string;
-  fileType: string;
-  fileSize: number;
-  creator: string;
-  creatorEmail?: string;
-  blockchainTx?: string;
-  timestamp: string;
-  ipfsHash?: string;
+
 }
 
 /**
@@ -59,12 +52,6 @@ export async function pinMetadataToIPFS(metadata: FileMetadata): Promise<string>
       body: JSON.stringify({
         pinataMetadata: {
           name: `BloomShield-${metadata.legalHash.substring(0, 8)}-metadata`,
-          keyvalues: {
-            creator: metadata.creator,
-            fileName: metadata.fileName,
-            legalHash: metadata.legalHash,
-            blockchainTx: metadata.blockchainTx || 'pending',
-          },
         },
         pinataOptions: {
           cidVersion: 1,

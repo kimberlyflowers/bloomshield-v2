@@ -191,7 +191,7 @@ export default function AuthModal({ show, onClose, onLoginSuccess, onSignUpSucce
     }
   };
 
-  const handleOAuthLogin = async (provider: 'google' | 'facebook') => {
+  const handleOAuthLogin = async (provider: 'google' | 'github') => {
     setError(null);
     setLoading(true);
 
@@ -264,14 +264,14 @@ export default function AuthModal({ show, onClose, onLoginSuccess, onSignUpSucce
 
               <button
                 type="button"
-                onClick={() => handleOAuthLogin('facebook')}
+                onClick={() => handleOAuthLogin('github')}
                 disabled={loading}
-                className="w-full bg-[#1877F2] text-white py-3 rounded-lg font-semibold hover:bg-[#166FE5] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                className="w-full bg-gray-900 text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  <path d="M12 .75a11.25 11.25 0 0 0-3.56 21.92c.56.1.77-.24.77-.54v-2.1c-3.14.68-3.8-1.33-3.8-1.33-.51-1.3-1.25-1.65-1.25-1.65-1.03-.7.08-.68.08-.68 1.13.08 1.73 1.16 1.73 1.16 1 .1 1.61.77 2.27.65.1-.73.4-1.23.72-1.51-2.51-.29-5.15-1.26-5.15-5.57 0-1.23.44-2.24 1.16-3.02-.12-.29-.5-1.44.11-3 0 0 .95-.31 3.1 1.15a10.8 10.8 0 0 1 5.64 0c2.15-1.46 3.1-1.15 3.1-1.15.61 1.56.23 2.71.11 3 .72.78 1.16 1.79 1.16 3.02 0 4.32-2.64 5.28-5.16 5.56.41.35.77 1.04.77 2.1v3.37c0 .3.2.65.78.54A11.25 11.25 0 0 0 12 .75Z"/>
                 </svg>
-                Continue with Facebook
+                Continue with GitHub
               </button>
             </div>
 
@@ -401,14 +401,14 @@ export default function AuthModal({ show, onClose, onLoginSuccess, onSignUpSucce
 
               <button
                 type="button"
-                onClick={() => handleOAuthLogin('facebook')}
+                onClick={() => handleOAuthLogin('github')}
                 disabled={loading}
-                className="w-full bg-[#1877F2] text-white py-3 rounded-lg font-semibold hover:bg-[#166FE5] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                className="w-full bg-gray-900 text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  <path d="M12 .75a11.25 11.25 0 0 0-3.56 21.92c.56.1.77-.24.77-.54v-2.1c-3.14.68-3.8-1.33-3.8-1.33-.51-1.3-1.25-1.65-1.25-1.65-1.03-.7.08-.68.08-.68 1.13.08 1.73 1.16 1.73 1.16 1 .1 1.61.77 2.27.65.1-.73.4-1.23.72-1.51-2.51-.29-5.15-1.26-5.15-5.57 0-1.23.44-2.24 1.16-3.02-.12-.29-.5-1.44.11-3 0 0 .95-.31 3.1 1.15a10.8 10.8 0 0 1 5.64 0c2.15-1.46 3.1-1.15 3.1-1.15.61 1.56.23 2.71.11 3 .72.78 1.16 1.79 1.16 3.02 0 4.32-2.64 5.28-5.16 5.56.41.35.77 1.04.77 2.1v3.37c0 .3.2.65.78.54A11.25 11.25 0 0 0 12 .75Z"/>
                 </svg>
-                Continue with Facebook
+                Continue with GitHub
               </button>
             </div>
 
