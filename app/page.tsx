@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import TopBar from '@/components/TopBar';
+import WorkspaceIcon from '@/components/WorkspaceIcon';
 import Toast from '@/components/Toast';
 import CertificateModal from '@/components/CertificateModal';
 import ProcessingOverlay from '@/components/ProcessingOverlay';
@@ -14,11 +15,12 @@ export default function Home() {
   // Auth state
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
+  const hasSession = useRef(false);
 
   // Page navigation state
   const [currentPage, setCurrentPage] = useState('home');
   const [isSidebarActive, setIsSidebarActive] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Toast state
   const [toastMessage, setToastMessage] = useState('');
@@ -144,7 +146,8 @@ export default function Home() {
     const { data: { subscription } } = onAuthStateChange((user) => {
       setCurrentUser(user);
       setIsLoggedIn(!!user);
-      setAuthLoading(false);
+      if (user && !hasSession.current) setCurrentPage('dashboard');
+      hasSession.current = !!user;
 
       if (user) {
         // Load user's wallet from their profile
@@ -232,7 +235,8 @@ export default function Home() {
 
       } else {
         setUserWallet(null);
-        setAuthLoading(false);
+        setCurrentPage('home');
+        setIsSidebarActive(false);
       }
     });
 
@@ -947,7 +951,7 @@ export default function Home() {
   // Handle navigation
   const handleNavigate = (page: string) => {
     setCurrentPage(page);
-    showToastMessage(`📄 Navigated to ${page.charAt(0).toUpperCase() + page.slice(1)}`, 'success');
+    setIsSidebarActive(false);
   };
 
   // Handle sidebar toggle
@@ -1061,34 +1065,42 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Backdrop Overlay for mobile sidebar - only show when logged in */}
-      {isLoggedIn && isSidebarActive && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-[998] md:hidden"
-          onClick={() => setIsSidebarActive(false)}
-        />
-      )}
+    <div className={isLoggedIn ? 'workspace min-h-screen' : 'min-h-screen bg-gray-50'}>
+      <TopBar
+        onLogin={handleLogin}
+        isLoggedIn={isLoggedIn}
+        onToggleSidebar={handleToggleSidebar}
+        onLogoClick={() => handleNavigate(isLoggedIn ? 'dashboard' : 'home')}
+        sidebarOpen={isSidebarActive}
+        sidebarCollapsed={isSidebarCollapsed}
+        onCollapseSidebar={() => setIsSidebarCollapsed(collapsed => !collapsed)}
+        accountName={currentUser?.name}
+        onProfile={() => handleNavigate('profile')}
+      />
 
-      {/* Sidebar - only render when logged in */}
-      {isLoggedIn && (
-        <Sidebar
-          isActive={isSidebarActive}
-          onNavigate={handleNavigate}
-          currentPage={currentPage}
-        />
-      )}
-
-      {/* Main Content */}
-      <div className={`transition-all duration-500 ease-in-out ${isLoggedIn && isSidebarActive ? 'ml-0 md:ml-[280px]' : 'ml-0'}`}>
-        {/* Top Bar */}
-        <TopBar
-          onLogin={handleLogin}
-          isLoggedIn={isLoggedIn}
-          onToggleSidebar={handleToggleSidebar}
-          onLogoClick={() => setCurrentPage('home')}
-        />
-
+      <div className={isLoggedIn
+        ? `md:grid ${isSidebarCollapsed ? 'md:grid-cols-[4rem_minmax(0,1fr)]' : 'md:grid-cols-[14rem_minmax(0,1fr)]'}`
+        : undefined}
+      >
+        {isLoggedIn && (
+          <>
+            {isSidebarActive && (
+              <button
+                type="button"
+                aria-label="Close workspace navigation"
+                className="fixed inset-x-0 bottom-0 top-16 z-30 bg-black/60 md:hidden"
+                onClick={() => setIsSidebarActive(false)}
+              />
+            )}
+            <Sidebar
+              isActive={isSidebarActive}
+              isCollapsed={isSidebarCollapsed}
+              onNavigate={handleNavigate}
+              currentPage={currentPage}
+            />
+          </>
+        )}
+        <main className="min-w-0">
         {/* Toast Notification */}
         <Toast
           message={toastMessage}
@@ -1200,60 +1212,38 @@ export default function Home() {
 
         {/* DASHBOARD PAGE */}
         {currentPage === 'dashboard' && (
-          <div className="flex h-[calc(100vh-70px)] bg-gray-50">
-            {/* Dashboard Submenu */}
-            <div className="w-60 bg-white border-r border-gray-200 p-8 overflow-y-auto">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Dashboard</h2>
-              <nav className="space-y-1">
+          <section>
+            <div className="workspace-tabs">
+              <nav aria-label="Dashboard sections">
                 <button
                   onClick={() => setDashboardSection('overview')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all border-l-3 ${
-                    dashboardSection === 'overview'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={dashboardSection === 'overview' ? 'true' : undefined}
                 >
                   Overview
                 </button>
                 <button
                   onClick={() => setDashboardSection('files')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                    dashboardSection === 'files'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={dashboardSection === 'files' ? 'true' : undefined}
                 >
                   My Files
                 </button>
                 <button
                   onClick={() => setDashboardSection('monitoring')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center justify-between ${
-                    dashboardSection === 'monitoring'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={dashboardSection === 'monitoring' ? 'true' : undefined}
                 >
                   Monitoring
-                  <span className="text-xs bg-orange-100 text-[#FF8C42] px-2 py-0.5 rounded-full font-bold">PRO</span>
+                  <span className="text-xs bg-workspace-highlight text-workspace-accent px-2 py-0.5 rounded-full font-bold">PRO</span>
                 </button>
                 <button
                   onClick={() => setDashboardSection('cases')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all flex items-center justify-between ${
-                    dashboardSection === 'cases'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={dashboardSection === 'cases' ? 'true' : undefined}
                 >
                   Cases
-                  <span className="text-xs bg-orange-100 text-[#FF8C42] px-2 py-0.5 rounded-full font-bold">PRO</span>
+                  <span className="text-xs bg-workspace-highlight text-workspace-accent px-2 py-0.5 rounded-full font-bold">PRO</span>
                 </button>
                 <button
                   onClick={() => setDashboardSection('licenses')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                    dashboardSection === 'licenses'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={dashboardSection === 'licenses' ? 'true' : undefined}
                 >
                   License Requests
                 </button>
@@ -1261,118 +1251,118 @@ export default function Home() {
             </div>
 
             {/* Dashboard Main Content */}
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="mx-auto max-w-7xl p-4 sm:p-8">
               {/* OVERVIEW SECTION */}
               {dashboardSection === 'overview' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Overview</h1>
+                  <div className="mb-6">
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-workspace-accent">Creator workspace</p>
+                    <h1 className="text-3xl font-bold tracking-tight">Dashboard overview</h1>
+                    <p className="mt-2 text-sm text-workspace-muted">Manage and protect your creative work.</p>
+                  </div>
 
                   {/* Stats Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-[#FF8C42]">
-                      <div className="text-gray-500 text-sm mb-2">Total Files Protected</div>
-                      <div className="text-4xl font-bold text-gray-800">{protectedFiles.length}</div>
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4 mb-8">
+                    <div className="workspace-card p-4 sm:p-5">
+                      <div className="text-workspace-muted text-sm mb-2">Total Files Protected</div>
+                      <div className="text-4xl font-bold text-workspace-text">{protectedFiles.length}</div>
                     </div>
-                    <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-[#FF8C42]">
-                      <div className="text-gray-500 text-sm mb-2">Active Monitoring</div>
-                      <div className="text-4xl font-bold text-gray-800">0</div>
+                    <div className="workspace-card p-4 sm:p-5">
+                      <div className="text-workspace-muted text-sm mb-2">Active Monitoring</div>
+                      <div className="text-4xl font-bold text-workspace-text">0</div>
                     </div>
-                    <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-[#FF8C42]">
-                      <div className="text-gray-500 text-sm mb-2">Open Cases</div>
-                      <div className="text-4xl font-bold text-gray-800">0</div>
+                    <div className="workspace-card p-4 sm:p-5">
+                      <div className="text-workspace-muted text-sm mb-2">Open Cases</div>
+                      <div className="text-4xl font-bold text-workspace-text">0</div>
                     </div>
-                    <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-[#FF8C42]">
-                      <div className="text-gray-500 text-sm mb-2">License Requests</div>
-                      <div className="text-4xl font-bold text-gray-800">3</div>
+                    <div className="workspace-card p-4 sm:p-5">
+                      <div className="text-workspace-muted text-sm mb-2">License Requests</div>
+                      <div className="text-4xl font-bold text-workspace-text">3</div>
                     </div>
                   </div>
 
-                  {/* Protect New Work - Upload Card */}
-                  <div className="mb-8">
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full group text-left"
-                    >
-                      <div className="bg-gradient-to-r from-[#FF8C42] to-[#ff7a2e] rounded-xl p-6 flex items-center gap-5 shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5 cursor-pointer">
-                        <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                          <svg viewBox="0 0 24 24" className="w-7 h-7 text-white" fill="currentColor">
-                            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 2.18l7 3.12v4.7c0 4.83-3.13 9.37-7 10.5-3.87-1.13-7-5.67-7-10.5V6.3l7-3.12z" />
-                            <path d="M11 11V8h2v3h3v2h-3v3h-2v-3H8v-2h3z" />
-                          </svg>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-white font-bold text-lg">Protect New Work</div>
-                          <div className="text-white/70 text-sm">
-                            {selectedFile
-                              ? `Selected: ${selectedFile.name} (${(selectedFile.size / 1024 / 1024).toFixed(2)} MB)`
-                              : 'Click to upload files and generate blockchain certificates'
-                            }
+                  <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(16rem,21rem)]">
+                    <section className="min-w-0">
+                      {/* Recent Files */}
+                      <h2 className="text-2xl font-bold text-workspace-text mb-6">Recent Files</h2>
+                      {protectedFiles.length === 0 ? (
+                        <div className="workspace-card px-6 py-12 text-center text-workspace-muted">
+                          <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-xl bg-workspace-field text-workspace-accent">
+                            <WorkspaceIcon name="file" />
                           </div>
+                          <p className="text-sm font-semibold text-workspace-text">No files protected yet</p>
+                          <p className="mt-1 text-sm">Protect a file to see it here.</p>
                         </div>
-                        <div className="text-white/40 group-hover:text-white/80 transition-colors shrink-0">
-                          <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M12 5v14M5 12h14" />
-                          </svg>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                          {protectedFiles.slice(0, 4).map((file, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              className="file-card min-w-0 cursor-pointer text-left"
+                              onClick={() => {
+                                setCertificateData(file);
+                                setShowCertificate(true);
+                              }}
+                            >
+                              <div className="w-full h-48 flex items-center justify-center text-6xl bg-workspace-field">
+                                {getFileIcon(file.fileType)}
+                              </div>
+                              <div className="p-5">
+                                <div className="font-semibold text-workspace-text mb-2 truncate" title={file.fileName}>
+                                  {file.fileName}
+                                </div>
+                                <div className="text-workspace-muted text-sm mb-3">
+                                  Protected {getRelativeDate(file.protectedDate)}
+                                </div>
+                                <div className="font-mono bg-workspace-field p-3 rounded-lg text-xs text-workspace-muted truncate" title={file.assetId}>
+                                  {file.assetId}
+                                </div>
+                              </div>
+                            </button>
+                          ))}
                         </div>
+                      )}
+                    </section>
+                    <aside className="workspace-card order-first self-start p-5 sm:p-6 xl:order-none">
+                      <div className="mb-4 grid h-10 w-10 place-items-center rounded-xl bg-workspace-highlight text-workspace-accent">
+                        <WorkspaceIcon name="shield" />
                       </div>
-                    </button>
+                      <h2 className="text-lg font-bold">Protect new work</h2>
+                      <p className="mb-5 mt-2 break-words text-sm leading-relaxed text-workspace-muted">
+                        {selectedFile
+                          ? `Selected: ${selectedFile.name} (${(selectedFile.size / 1024 / 1024).toFixed(2)} MB)`
+                          : 'Upload a file to generate its blockchain certificate.'}
+                      </p>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="workspace-action w-full rounded-lg px-4 py-2.5 text-sm"
+                      >
+                        Choose file
+                      </button>
+                    </aside>
                   </div>
-
-                  {/* Recent Files */}
-                  <h2 className="text-2xl font-bold text-gray-800 mb-6">Recent Files</h2>
-                  {protectedFiles.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400">
-                      No files protected yet
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      {protectedFiles.slice(0, 4).map((file, index) => (
-                        <div
-                          key={index}
-                          className="file-card cursor-pointer"
-                          onClick={() => {
-                            setCertificateData(file);
-                            setShowCertificate(true);
-                          }}
-                        >
-                          <div className="w-full h-48 flex items-center justify-center text-6xl bg-[#E8E8E8]">
-                            {getFileIcon(file.fileType)}
-                          </div>
-                          <div className="p-5">
-                            <div className="font-semibold text-gray-800 mb-2 truncate" title={file.fileName}>
-                              {file.fileName}
-                            </div>
-                            <div className="text-gray-500 text-sm mb-3">
-                              Protected {getRelativeDate(file.protectedDate)}
-                            </div>
-                            <div className="font-mono bg-gray-100 p-3 rounded-lg text-xs text-gray-600 truncate" title={file.assetId}>
-                              {file.assetId}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
 
               {/* MY FILES SECTION */}
               {dashboardSection === 'files' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-4">My Files</h1>
-                  <p className="text-gray-600 mb-8">All your protected files in one place</p>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-4">My Files</h1>
+                  <p className="text-workspace-muted mb-8">All your protected files in one place</p>
 
                   {protectedFiles.length === 0 ? (
                     <div className="text-center py-16">
                       <div className="text-6xl mb-4">📁</div>
-                      <p className="text-gray-500 text-lg mb-2">No protected files yet</p>
-                      <p className="text-gray-400">Upload a file to get started with BloomShield protection</p>
+                      <p className="text-workspace-muted text-lg mb-2">No protected files yet</p>
+                      <p className="text-workspace-muted">Upload a file to get started with BloomShield protection</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1385,17 +1375,17 @@ export default function Home() {
                               setShowCertificate(true);
                             }}
                           >
-                            <div className="w-full h-48 flex items-center justify-center text-6xl bg-[#E8E8E8]">
+                            <div className="w-full h-48 flex items-center justify-center text-6xl bg-workspace-field">
                               {getFileIcon(file.fileType)}
                             </div>
                             <div className="p-5">
-                              <div className="font-semibold text-gray-800 mb-2 truncate" title={file.fileName}>
+                              <div className="font-semibold text-workspace-text mb-2 truncate" title={file.fileName}>
                                 {file.fileName}
                               </div>
-                              <div className="text-gray-500 text-sm mb-3">
+                              <div className="text-workspace-muted text-sm mb-3">
                                 Protected {getRelativeDate(file.protectedDate)}
                               </div>
-                              <div className="font-mono bg-gray-100 p-3 rounded-lg text-xs text-gray-600 truncate" title={file.assetId}>
+                              <div className="font-mono bg-workspace-field p-3 rounded-lg text-xs text-workspace-muted truncate" title={file.assetId}>
                                 {file.assetId}
                               </div>
                             </div>
@@ -1405,7 +1395,7 @@ export default function Home() {
                           <div className="px-5 pb-5 space-y-2">
                             {file.isListed ? (
                               <div className="space-y-2">
-                                <div className="bg-green-50 border border-green-200 text-green-700 text-center py-2 rounded-lg text-sm font-semibold">
+                                <div className="bg-emerald-950/60 border border-emerald-800 text-emerald-200 text-center py-2 rounded-lg text-sm font-semibold">
                                   ✓ Listed on Marketplace
                                 </div>
                                 <button
@@ -1413,7 +1403,7 @@ export default function Home() {
                                     e.stopPropagation();
                                     handleUnlistAsset(file.assetId);
                                   }}
-                                  className="w-full bg-gray-200 text-gray-700 py-2 rounded-lg text-sm font-semibold hover:bg-gray-300 transition-all"
+                                  className="w-full bg-workspace-hover text-workspace-text py-2 rounded-lg text-sm font-semibold hover:bg-workspace-hover transition-all"
                                 >
                                   Remove from Marketplace
                                 </button>
@@ -1424,7 +1414,7 @@ export default function Home() {
                                   e.stopPropagation();
                                   handleListAsset(file);
                                 }}
-                                className="w-full bg-[#FF8C42] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#ff7a2e] transition-all"
+                                className="w-full workspace-action py-2 rounded-lg text-sm font-semibold  transition-all"
                               >
                                 🛒 List on Marketplace
                               </button>
@@ -1440,14 +1430,14 @@ export default function Home() {
               {/* MONITORING SECTION */}
               {dashboardSection === 'monitoring' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Monitoring</h1>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Monitoring</h1>
 
-                  <div className="bg-[#FFB8A3] rounded-2xl p-12 text-center text-white shadow-lg">
+                  <div className="bg-workspace-highlight rounded-2xl p-12 text-center text-white shadow-lg">
                     <h3 className="text-3xl font-bold mb-4">🔍 Unlock Advanced Monitoring</h3>
                     <p className="text-xl mb-8 opacity-95">Track your content across the web and get alerts when copies are detected</p>
                     <button
                       onClick={handleUpgradeToPro}
-                      className="bg-white text-[#FF8C42] font-bold py-4 px-10 rounded-lg hover:shadow-xl transition-all text-lg"
+                      className="bg-workspace-panel text-workspace-accent font-bold py-4 px-10 rounded-lg hover:shadow-xl transition-all text-lg"
                     >
                       Upgrade to Pro
                     </button>
@@ -1458,14 +1448,14 @@ export default function Home() {
               {/* CASES SECTION */}
               {dashboardSection === 'cases' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Cases</h1>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Cases</h1>
 
-                  <div className="bg-[#FFB8A3] rounded-2xl p-12 text-center text-white shadow-lg">
+                  <div className="bg-workspace-highlight rounded-2xl p-12 text-center text-white shadow-lg">
                     <h3 className="text-3xl font-bold mb-4">⚖️ Unlock Case Management</h3>
                     <p className="text-xl mb-8 opacity-95">Manage infringement cases and work with legal partners to protect your rights</p>
                     <button
                       onClick={handleUpgradeToPro}
-                      className="bg-white text-[#FF8C42] font-bold py-4 px-10 rounded-lg hover:shadow-xl transition-all text-lg"
+                      className="bg-workspace-panel text-workspace-accent font-bold py-4 px-10 rounded-lg hover:shadow-xl transition-all text-lg"
                     >
                       Upgrade to Pro
                     </button>
@@ -1476,74 +1466,52 @@ export default function Home() {
               {/* LICENSE REQUESTS SECTION */}
               {dashboardSection === 'licenses' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-4">License Requests</h1>
-                  <p className="text-gray-600 mb-8">Manage incoming licensing requests for your work</p>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-4">License Requests</h1>
+                  <p className="text-workspace-muted mb-8">Manage incoming licensing requests for your work</p>
 
-                  <div className="bg-white rounded-xl shadow-md p-16 text-center">
+                  <div className="workspace-card p-16 text-center">
                     <div className="text-6xl mb-4">💼</div>
-                    <p className="text-gray-500 text-lg">No license requests yet</p>
-                    <p className="text-gray-400 text-sm mt-2">When someone requests to license your work, it will appear here</p>
+                    <p className="text-workspace-muted text-lg">No license requests yet</p>
+                    <p className="text-workspace-muted text-sm mt-2">When someone requests to license your work, it will appear here</p>
                   </div>
                 </div>
               )}
             </div>
-          </div>
+          </section>
         )}
 
         {/* WALLET PAGE */}
         {currentPage === 'wallet' && (
-          <div className="flex h-[calc(100vh-70px)] bg-gray-50">
-            {/* Wallet Submenu */}
-            <div className="w-60 bg-white border-r border-gray-200 p-8 overflow-y-auto">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Wallet</h2>
-              <nav className="space-y-1">
+          <section>
+            <div className="workspace-tabs">
+              <nav aria-label="Wallet sections">
                 <button
                   onClick={() => setWalletSection('overview')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                    walletSection === 'overview'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={walletSection === 'overview' ? 'true' : undefined}
                 >
                   Overview
                 </button>
                 <button
                   onClick={() => setWalletSection('cards')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                    walletSection === 'cards'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={walletSection === 'cards' ? 'true' : undefined}
                 >
                   Cards
                 </button>
                 <button
                   onClick={() => setWalletSection('transactions')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                    walletSection === 'transactions'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={walletSection === 'transactions' ? 'true' : undefined}
                 >
                   Transactions
                 </button>
                 <button
                   onClick={() => setWalletSection('deposit')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                    walletSection === 'deposit'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={walletSection === 'deposit' ? 'true' : undefined}
                 >
                   Direct Deposit
                 </button>
                 <button
                   onClick={() => setWalletSection('settings')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                    walletSection === 'settings'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={walletSection === 'settings' ? 'true' : undefined}
                 >
                   Settings
                 </button>
@@ -1551,40 +1519,40 @@ export default function Home() {
             </div>
 
             {/* Wallet Main Content */}
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="mx-auto max-w-7xl p-4 sm:p-8">
               {/* OVERVIEW SECTION */}
               {walletSection === 'overview' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Overview</h1>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Overview</h1>
 
                   {/* Balance Display */}
-                  <div className="bg-white rounded-xl shadow-md p-8 mb-8">
-                    <div className="text-gray-500 text-sm mb-2">Available Balance</div>
-                    <div className="text-5xl font-bold text-gray-800 mb-2">$0.00</div>
-                    <div className="text-gray-600 text-sm">Total earnings: $0.00</div>
+                  <div className="workspace-card p-8 mb-8">
+                    <div className="text-workspace-muted text-sm mb-2">Available Balance</div>
+                    <div className="text-5xl font-bold text-workspace-text mb-2">$0.00</div>
+                    <div className="text-workspace-muted text-sm">Total earnings: $0.00</div>
                   </div>
 
                   {/* Quick Actions */}
                   <div className="grid grid-cols-2 gap-4 mb-8">
                     <button
                       onClick={handleAddMoney}
-                      className="bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-semibold py-4 px-6 rounded-lg transition-all"
+                      className="bg-[#FF8C42]  text-white font-semibold py-4 px-6 rounded-lg transition-all"
                     >
                       + Add Money
                     </button>
                     <button
                       onClick={handleWithdraw}
-                      className="bg-white border-2 border-[#FF8C42] text-[#FF8C42] hover:bg-orange-50 font-semibold py-4 px-6 rounded-lg transition-all"
+                      className="bg-workspace-panel border-2 border-workspace-accent text-workspace-accent hover:bg-workspace-highlight font-semibold py-4 px-6 rounded-lg transition-all"
                     >
                       Withdraw
                     </button>
                   </div>
 
                   {/* Recent Transactions */}
-                  <h2 className="text-2xl font-bold text-gray-800 mb-4">Recent Transactions</h2>
-                  <div className="bg-white rounded-xl shadow-md p-16 text-center">
+                  <h2 className="text-2xl font-bold text-workspace-text mb-4">Recent Transactions</h2>
+                  <div className="workspace-card p-16 text-center">
                     <div className="text-6xl mb-4">📊</div>
-                    <p className="text-gray-500">No transactions yet</p>
+                    <p className="text-workspace-muted">No transactions yet</p>
                   </div>
                 </div>
               )}
@@ -1592,7 +1560,7 @@ export default function Home() {
               {/* CARDS SECTION */}
               {walletSection === 'cards' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-8">BloomCard</h1>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-8">BloomCard</h1>
 
                   {/* 3D Credit Card */}
                   <div
@@ -1621,47 +1589,47 @@ export default function Home() {
 
                   {/* Color Picker */}
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Card Color</h3>
+                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Card Color</h3>
                     <div className="flex gap-4">
                       <button
                         onClick={() => setCardColor('blush')}
                         className={`w-16 h-16 rounded-full bg-gradient-to-br from-pink-300 to-pink-200 ${
-                          cardColor === 'blush' ? 'ring-4 ring-[#FF8C42] ring-offset-2' : ''
+                          cardColor === 'blush' ? 'ring-4 ring-workspace-accent ring-offset-2' : ''
                         }`}
                       />
                       <button
                         onClick={() => setCardColor('black')}
                         className={`w-16 h-16 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 ${
-                          cardColor === 'black' ? 'ring-4 ring-[#FF8C42] ring-offset-2' : ''
+                          cardColor === 'black' ? 'ring-4 ring-workspace-accent ring-offset-2' : ''
                         }`}
                       />
                       <button
                         onClick={() => setCardColor('orange')}
                         className={`w-16 h-16 rounded-full bg-gradient-to-br from-orange-400 to-pink-400 ${
-                          cardColor === 'orange' ? 'ring-4 ring-[#FF8C42] ring-offset-2' : ''
+                          cardColor === 'orange' ? 'ring-4 ring-workspace-accent ring-offset-2' : ''
                         }`}
                       />
                     </div>
                   </div>
 
                   {/* Card Details */}
-                  <div className="bg-white rounded-xl shadow-md p-8 mt-8">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-6">Card Details</h3>
+                  <div className="workspace-card p-8 mt-8">
+                    <h3 className="text-xl font-semibold text-workspace-text mb-6">Card Details</h3>
                     <div className="grid grid-cols-2 gap-6">
                       <div>
-                        <div className="text-gray-500 text-sm mb-1">Card Number</div>
+                        <div className="text-workspace-muted text-sm mb-1">Card Number</div>
                         <div className="font-semibold">•••• •••• •••• 4242</div>
                       </div>
                       <div>
-                        <div className="text-gray-500 text-sm mb-1">CVV</div>
+                        <div className="text-workspace-muted text-sm mb-1">CVV</div>
                         <div className="font-semibold">•••</div>
                       </div>
                       <div>
-                        <div className="text-gray-500 text-sm mb-1">Status</div>
-                        <div className="text-green-600 font-semibold">● Active</div>
+                        <div className="text-workspace-muted text-sm mb-1">Status</div>
+                        <div className="text-emerald-300 font-semibold">● Active</div>
                       </div>
                       <div>
-                        <div className="text-gray-500 text-sm mb-1">Type</div>
+                        <div className="text-workspace-muted text-sm mb-1">Type</div>
                         <div className="font-semibold">Virtual Card</div>
                       </div>
                     </div>
@@ -1672,12 +1640,12 @@ export default function Home() {
               {/* TRANSACTIONS SECTION */}
               {walletSection === 'transactions' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Transactions</h1>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Transactions</h1>
 
-                  <div className="bg-white rounded-xl shadow-md p-16 text-center">
+                  <div className="workspace-card p-16 text-center">
                     <div className="text-6xl mb-4">📋</div>
-                    <p className="text-gray-500 text-lg">No transactions yet</p>
-                    <p className="text-gray-400 text-sm mt-2">All licensing payments and withdrawals will appear here</p>
+                    <p className="text-workspace-muted text-lg">No transactions yet</p>
+                    <p className="text-workspace-muted text-sm mt-2">All licensing payments and withdrawals will appear here</p>
                   </div>
                 </div>
               )}
@@ -1685,14 +1653,14 @@ export default function Home() {
               {/* DIRECT DEPOSIT SECTION */}
               {walletSection === 'deposit' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Direct Deposit</h1>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Direct Deposit</h1>
 
-                  <div className="bg-white rounded-xl shadow-md p-16 text-center">
+                  <div className="workspace-card p-16 text-center">
                     <div className="text-6xl mb-4">🏦</div>
-                    <p className="text-gray-500 text-lg mb-6">No bank account connected</p>
+                    <p className="text-workspace-muted text-lg mb-6">No bank account connected</p>
                     <button
                       onClick={handleConnectBank}
-                      className="bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-bold py-3 px-8 rounded-lg transition-all"
+                      className="bg-[#FF8C42]  text-white font-bold py-3 px-8 rounded-lg transition-all"
                     >
                       Connect Bank Account
                     </button>
@@ -1703,90 +1671,90 @@ export default function Home() {
               {/* SETTINGS SECTION */}
               {walletSection === 'settings' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Wallet Settings</h1>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Wallet Settings</h1>
 
-                  <div className="bg-white rounded-xl shadow-md divide-y">
+                  <div className="workspace-card divide-y">
                     <div className="p-6">
-                      <h3 className="font-semibold text-gray-800 mb-2">Payment Notifications</h3>
-                      <p className="text-gray-500 text-sm">Get notified when you receive payments</p>
+                      <h3 className="font-semibold text-workspace-text mb-2">Payment Notifications</h3>
+                      <p className="text-workspace-muted text-sm">Get notified when you receive payments</p>
                     </div>
                     <div className="p-6">
-                      <h3 className="font-semibold text-gray-800 mb-2">Auto-Withdraw</h3>
-                      <p className="text-gray-500 text-sm">Automatically transfer earnings to your bank</p>
+                      <h3 className="font-semibold text-workspace-text mb-2">Auto-Withdraw</h3>
+                      <p className="text-workspace-muted text-sm">Automatically transfer earnings to your bank</p>
                     </div>
                     <div className="p-6">
-                      <h3 className="font-semibold text-gray-800 mb-2">Spending Limits</h3>
-                      <p className="text-gray-500 text-sm">Set daily or monthly spending limits</p>
+                      <h3 className="font-semibold text-workspace-text mb-2">Spending Limits</h3>
+                      <p className="text-workspace-muted text-sm">Set daily or monthly spending limits</p>
                     </div>
                   </div>
                 </div>
               )}
             </div>
-          </div>
+          </section>
         )}
 
         {/* MARKETPLACE PAGE */}
         {currentPage === 'marketplace' && (
           <div className="p-4 md:p-8 max-w-7xl mx-auto">
             <div className="mb-8">
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">Marketplace</h1>
-              <p className="text-gray-600">License your protected content and earn revenue</p>
+              <h1 className="text-3xl md:text-4xl font-bold text-workspace-text mb-2">Marketplace</h1>
+              <p className="text-workspace-muted">License your protected content and earn revenue</p>
             </div>
 
             {/* Marketplace Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 mb-8">
-              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-purple-500">
-                <div className="text-gray-500 text-sm mb-2">Listed Items</div>
-                <div className="text-3xl font-bold text-gray-800">0</div>
-                <div className="text-xs text-gray-400 mt-1">Available for license</div>
+              <div className="workspace-card p-6 border-l-4 border-purple-500">
+                <div className="text-workspace-muted text-sm mb-2">Listed Items</div>
+                <div className="text-3xl font-bold text-workspace-text">0</div>
+                <div className="text-xs text-workspace-muted mt-1">Available for license</div>
               </div>
-              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500">
-                <div className="text-gray-500 text-sm mb-2">Active Licenses</div>
-                <div className="text-3xl font-bold text-gray-800">0</div>
-                <div className="text-xs text-gray-400 mt-1">Currently licensed</div>
+              <div className="workspace-card p-6 border-l-4 border-green-500">
+                <div className="text-workspace-muted text-sm mb-2">Active Licenses</div>
+                <div className="text-3xl font-bold text-workspace-text">0</div>
+                <div className="text-xs text-workspace-muted mt-1">Currently licensed</div>
               </div>
-              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-yellow-500">
-                <div className="text-gray-500 text-sm mb-2">Pending Requests</div>
-                <div className="text-3xl font-bold text-gray-800">0</div>
-                <div className="text-xs text-gray-400 mt-1">Awaiting approval</div>
+              <div className="workspace-card p-6 border-l-4 border-yellow-500">
+                <div className="text-workspace-muted text-sm mb-2">Pending Requests</div>
+                <div className="text-3xl font-bold text-workspace-text">0</div>
+                <div className="text-xs text-workspace-muted mt-1">Awaiting approval</div>
               </div>
-              <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
-                <div className="text-gray-500 text-sm mb-2">Total Revenue</div>
-                <div className="text-3xl font-bold text-gray-800">$0</div>
-                <div className="text-xs text-gray-400 mt-1">Lifetime earnings</div>
+              <div className="workspace-card p-6 border-l-4 border-blue-500">
+                <div className="text-workspace-muted text-sm mb-2">Total Revenue</div>
+                <div className="text-3xl font-bold text-workspace-text">$0</div>
+                <div className="text-xs text-workspace-muted mt-1">Lifetime earnings</div>
               </div>
             </div>
 
             {/* List Content */}
-            <div className="bg-[#FFB8A3] rounded-2xl p-8 mb-8 text-white shadow-lg">
+            <div className="bg-workspace-highlight rounded-2xl p-8 mb-8 text-white shadow-lg">
               <h2 className="text-2xl font-bold mb-2">List Your Protected Content</h2>
               <p className="text-white/90 mb-6">Set licensing terms and earn passive income from your creations</p>
               <button
                 onClick={handleCreateListing}
-                className="bg-white text-[#FF8C42] font-bold py-3 px-8 rounded-lg hover:shadow-lg transition-all"
+                className="bg-workspace-panel text-workspace-accent font-bold py-3 px-8 rounded-lg hover:shadow-lg transition-all"
               >
                 Create Listing
               </button>
             </div>
 
             {/* License Types */}
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Available License Types</h2>
+            <div className="workspace-card p-6">
+              <h2 className="text-xl font-bold text-workspace-text mb-4">Available License Types</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 transition-all">
+                <div className="p-4 border-2 border-workspace-border rounded-lg hover:border-purple-500 transition-all">
                   <div className="text-2xl mb-2">📄</div>
-                  <div className="font-semibold text-gray-800 mb-1">Personal Use</div>
-                  <div className="text-sm text-gray-500">Non-commercial projects</div>
+                  <div className="font-semibold text-workspace-text mb-1">Personal Use</div>
+                  <div className="text-sm text-workspace-muted">Non-commercial projects</div>
                 </div>
-                <div className="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 transition-all">
+                <div className="p-4 border-2 border-workspace-border rounded-lg hover:border-purple-500 transition-all">
                   <div className="text-2xl mb-2">💼</div>
-                  <div className="font-semibold text-gray-800 mb-1">Commercial Use</div>
-                  <div className="text-sm text-gray-500">Business & marketing</div>
+                  <div className="font-semibold text-workspace-text mb-1">Commercial Use</div>
+                  <div className="text-sm text-workspace-muted">Business & marketing</div>
                 </div>
-                <div className="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 transition-all">
+                <div className="p-4 border-2 border-workspace-border rounded-lg hover:border-purple-500 transition-all">
                   <div className="text-2xl mb-2">🌐</div>
-                  <div className="font-semibold text-gray-800 mb-1">Exclusive Rights</div>
-                  <div className="text-sm text-gray-500">Full ownership transfer</div>
+                  <div className="font-semibold text-workspace-text mb-1">Exclusive Rights</div>
+                  <div className="text-sm text-workspace-muted">Full ownership transfer</div>
                 </div>
               </div>
             </div>
@@ -1798,12 +1766,12 @@ export default function Home() {
           <div className="p-4 md:p-8 max-w-7xl mx-auto">
             {/* Marketplace Header */}
             <div className="mb-8">
-              <h1 className="text-4xl font-bold text-gray-800 mb-4">Marketplace</h1>
-              <p className="text-gray-600">Buy or lease creative assets protected on blockchain</p>
+              <h1 className="text-4xl font-bold text-workspace-text mb-4">Marketplace</h1>
+              <p className="text-workspace-muted">Buy or lease creative assets protected on blockchain</p>
             </div>
 
             {/* Search Bar */}
-            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+            <div className="workspace-card p-6 mb-6">
               <div className="flex gap-4">
                 <input
                   type="text"
@@ -1811,11 +1779,11 @@ export default function Home() {
                   onChange={(e) => setMarketplaceSearchQuery(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleMarketplaceSearch()}
                   placeholder="Search assets by name, creator, or Asset ID..."
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                  className="flex-1 px-4 py-3 border border-workspace-border rounded-lg focus:outline-none focus:ring-2 focus:ring-workspace-accent"
                 />
                 <button
                   onClick={handleMarketplaceSearch}
-                  className="bg-[#FF8C42] text-white px-8 py-3 rounded-lg font-semibold hover:bg-[#ff7a2e] transition-all"
+                  className="workspace-action px-8 py-3 rounded-lg font-semibold  transition-all"
                 >
                   🔍 Search
                 </button>
@@ -1823,14 +1791,14 @@ export default function Home() {
             </div>
 
             {/* Filters */}
-            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+            <div className="workspace-card p-6 mb-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Asset Type</label>
+                  <label className="block text-sm font-semibold text-workspace-text mb-2">Asset Type</label>
                   <select
                     value={marketplaceFilters.type}
                     onChange={(e) => setMarketplaceFilters({ ...marketplaceFilters, type: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                    className="w-full px-4 py-2 border border-workspace-border rounded-lg focus:outline-none focus:ring-2 focus:ring-workspace-accent"
                   >
                     <option value="all">All Types</option>
                     <option value="image">Images</option>
@@ -1842,11 +1810,11 @@ export default function Home() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">License Type</label>
+                  <label className="block text-sm font-semibold text-workspace-text mb-2">License Type</label>
                   <select
                     value={marketplaceFilters.license}
                     onChange={(e) => setMarketplaceFilters({ ...marketplaceFilters, license: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                    className="w-full px-4 py-2 border border-workspace-border rounded-lg focus:outline-none focus:ring-2 focus:ring-workspace-accent"
                   >
                     <option value="all">All</option>
                     <option value="sale">For Sale</option>
@@ -1855,11 +1823,11 @@ export default function Home() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Price Range</label>
+                  <label className="block text-sm font-semibold text-workspace-text mb-2">Price Range</label>
                   <select
                     value={marketplaceFilters.price}
                     onChange={(e) => setMarketplaceFilters({ ...marketplaceFilters, price: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                    className="w-full px-4 py-2 border border-workspace-border rounded-lg focus:outline-none focus:ring-2 focus:ring-workspace-accent"
                   >
                     <option value="all">Any Price</option>
                     <option value="0-50">$0 - $50</option>
@@ -1870,11 +1838,11 @@ export default function Home() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Sort By</label>
+                  <label className="block text-sm font-semibold text-workspace-text mb-2">Sort By</label>
                   <select
                     value={marketplaceFilters.sort}
                     onChange={(e) => setMarketplaceFilters({ ...marketplaceFilters, sort: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                    className="w-full px-4 py-2 border border-workspace-border rounded-lg focus:outline-none focus:ring-2 focus:ring-workspace-accent"
                   >
                     <option value="newest">Newest First</option>
                     <option value="price-low">Price: Low to High</option>
@@ -1894,40 +1862,40 @@ export default function Home() {
             {/* Asset Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {marketplaceAssets.length === 0 ? (
-                <div className="col-span-full bg-white rounded-xl shadow-md p-16 text-center">
+                <div className="col-span-full workspace-card p-16 text-center">
                   <div className="text-6xl mb-4">🛒</div>
-                  <p className="text-gray-500 text-lg mb-2">No assets listed yet</p>
-                  <p className="text-gray-400 text-sm">Check back later for new listings!</p>
+                  <p className="text-workspace-muted text-lg mb-2">No assets listed yet</p>
+                  <p className="text-workspace-muted text-sm">Check back later for new listings!</p>
                 </div>
               ) : (
                 marketplaceAssets.map((asset, index) => (
                   <div
                     key={index}
                     onClick={() => handleViewAsset(asset)}
-                    className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-xl transition-all transform hover:-translate-y-1"
+                    className="workspace-card overflow-hidden cursor-pointer hover:shadow-xl transition-all transform hover:-translate-y-1"
                   >
                     {/* Asset Thumbnail */}
-                    <div className="h-48 bg-gradient-to-br from-orange-100 to-pink-100 flex items-center justify-center">
+                    <div className="h-48 bg-gradient-to-br from-workspace-highlight to-workspace-hover flex items-center justify-center">
                       <div className="text-6xl">{getFileIcon(asset.fileType)}</div>
                     </div>
 
                     {/* Asset Info */}
                     <div className="p-4">
-                      <h3 className="font-bold text-gray-800 mb-2 truncate">{asset.fileName}</h3>
-                      <p className="text-sm text-gray-500 mb-3">by {asset.creator}</p>
+                      <h3 className="font-bold text-workspace-text mb-2 truncate">{asset.fileName}</h3>
+                      <p className="text-sm text-workspace-muted mb-3">by {asset.creator}</p>
 
                       <div className="flex items-center justify-between mb-3">
                         {asset.salePrice > 0 && (
-                          <div className="text-2xl font-bold text-[#FF8C42]">${asset.salePrice}</div>
+                          <div className="text-2xl font-bold text-workspace-accent">${asset.salePrice}</div>
                         )}
                         {asset.allowLease && (
-                          <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full font-semibold">
+                          <span className="bg-violet-900/60 text-violet-200 text-xs px-2 py-1 rounded-full font-semibold">
                             Lease Available
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between text-xs text-gray-500">
+                      <div className="flex items-center justify-between text-xs text-workspace-muted">
                         <span>{asset.fileType}</span>
                         <span>{getRelativeDate(asset.protectedDate)}</span>
                       </div>
@@ -1943,7 +1911,7 @@ export default function Home() {
         {currentPage === 'profile' && (
           <div className="p-4 md:p-8 max-w-4xl mx-auto">
             {/* Profile Header */}
-            <div className="bg-white rounded-xl shadow-md p-8 mb-6 text-center">
+            <div className="workspace-card p-8 mb-6 text-center">
               <input
                 type="file"
                 ref={profilePhotoInputRef}
@@ -1953,7 +1921,7 @@ export default function Home() {
               />
               <div
                 onClick={() => profilePhotoInputRef.current?.click()}
-                className="w-32 h-32 mx-auto mb-4 rounded-full bg-[#E8E8E8] flex items-center justify-center text-6xl cursor-pointer hover:opacity-80 transition-all overflow-hidden"
+                className="w-32 h-32 mx-auto mb-4 rounded-full bg-workspace-field flex items-center justify-center text-6xl cursor-pointer hover:opacity-80 transition-all overflow-hidden"
                 style={{
                   backgroundImage: profileData.profilePhoto.startsWith('data:') ? `url(${profileData.profilePhoto})` : 'none',
                   backgroundSize: 'cover',
@@ -1962,22 +1930,22 @@ export default function Home() {
               >
                 {!profileData.profilePhoto.startsWith('data:') && profileData.profilePhoto}
               </div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">{profileData.fullName}</h1>
-              <div className="inline-block bg-orange-100 text-[#FF8C42] px-4 py-1 rounded-full font-semibold text-sm mb-2">
+              <h1 className="text-3xl font-bold text-workspace-text mb-2">{profileData.fullName}</h1>
+              <div className="inline-block bg-workspace-highlight text-workspace-accent px-4 py-1 rounded-full font-semibold text-sm mb-2">
                 {profileData.accountType === 'pro' ? '🌟 Pro Account' : '🆓 Free Account'}
               </div>
-              <p className="text-gray-500 text-sm">Member since: {profileData.memberSince}</p>
+              <p className="text-workspace-muted text-sm">Member since: {profileData.memberSince}</p>
             </div>
 
             {/* Personal Information */}
-            <div className="bg-white rounded-xl shadow-md p-8 mb-6">
+            <div className="workspace-card p-8 mb-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Personal Information</h2>
+                <h2 className="text-2xl font-bold text-workspace-text">Personal Information</h2>
                 <div className="flex gap-2">
                   {profileEditMode && (
                     <button
                       onClick={handleProfileCancel}
-                      className="px-4 py-2 border-2 border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-all font-semibold"
+                      className="px-4 py-2 border-2 border-workspace-border text-workspace-muted rounded-lg hover:bg-workspace-field transition-all font-semibold"
                     >
                       Cancel
                     </button>
@@ -1986,8 +1954,8 @@ export default function Home() {
                     onClick={handleProfileEdit}
                     className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                       profileEditMode
-                        ? 'bg-[#FF8C42] text-white hover:bg-[#ff7a2e]'
-                        : 'border-2 border-[#FF8C42] text-[#FF8C42] hover:bg-orange-50'
+                        ? 'workspace-action '
+                        : 'border-2 border-workspace-accent text-workspace-accent hover:bg-workspace-highlight'
                     }`}
                   >
                     {profileEditMode ? 'Save' : 'Edit'}
@@ -1996,51 +1964,51 @@ export default function Home() {
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Full Name</label>
+                  <label className="block text-sm text-workspace-muted mb-1">Full Name</label>
                   <input
                     type="text"
                     value={profileData.fullName}
                     onChange={(e) => setProfileData(prev => ({ ...prev, fullName: e.target.value }))}
                     disabled={!profileEditMode}
-                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                    className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none disabled:bg-workspace-field disabled:text-workspace-muted"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Email</label>
+                  <label className="block text-sm text-workspace-muted mb-1">Email</label>
                   <input
                     type="email"
                     value={profileData.email}
                     onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
                     disabled={!profileEditMode}
-                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                    className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none disabled:bg-workspace-field disabled:text-workspace-muted"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Phone (optional)</label>
+                  <label className="block text-sm text-workspace-muted mb-1">Phone (optional)</label>
                   <input
                     type="tel"
                     value={profileData.phone}
                     onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
                     disabled={!profileEditMode}
                     placeholder="+1 (555) 000-0000"
-                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                    className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none disabled:bg-workspace-field disabled:text-workspace-muted"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Bio</label>
+                  <label className="block text-sm text-workspace-muted mb-1">Bio</label>
                   <textarea
                     value={profileData.bio}
                     onChange={(e) => setProfileData(prev => ({ ...prev, bio: e.target.value }))}
                     disabled={!profileEditMode}
                     rows={3}
-                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600 resize-none"
+                    className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none disabled:bg-workspace-field disabled:text-workspace-muted resize-none"
                   />
                 </div>
               </div>
             </div>
 
             {/* Business Information */}
-            <div className="bg-white rounded-xl shadow-md p-8 mb-6">
+            <div className="workspace-card p-8 mb-6">
               <div className="mb-6">
                 <label className="flex items-center cursor-pointer">
                   <input
@@ -2048,41 +2016,41 @@ export default function Home() {
                     checked={profileData.businessEnabled}
                     onChange={(e) => setProfileData(prev => ({ ...prev, businessEnabled: e.target.checked }))}
                     disabled={!profileEditMode}
-                    className="w-5 h-5 text-[#FF8C42] rounded focus:ring-[#FF8C42] disabled:opacity-50"
+                    className="w-5 h-5 text-workspace-accent rounded focus:ring-workspace-accent disabled:opacity-50"
                   />
-                  <span className="ml-2 text-lg font-semibold text-gray-800">I'm using BloomShield for business</span>
+                  <span className="ml-2 text-lg font-semibold text-workspace-text">I'm using BloomShield for business</span>
                 </label>
               </div>
               {profileData.businessEnabled && (
                 <div className="space-y-4 border-t pt-6">
                   <div>
-                    <label className="block text-sm text-gray-500 mb-1">Business Name</label>
+                    <label className="block text-sm text-workspace-muted mb-1">Business Name</label>
                     <input
                       type="text"
                       value={profileData.businessName}
                       onChange={(e) => setProfileData(prev => ({ ...prev, businessName: e.target.value }))}
                       disabled={!profileEditMode}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                      className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none disabled:bg-workspace-field disabled:text-workspace-muted"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-500 mb-1">Company Website</label>
+                    <label className="block text-sm text-workspace-muted mb-1">Company Website</label>
                     <input
                       type="url"
                       value={profileData.companyWebsite}
                       onChange={(e) => setProfileData(prev => ({ ...prev, companyWebsite: e.target.value }))}
                       disabled={!profileEditMode}
                       placeholder="https://example.com"
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                      className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none disabled:bg-workspace-field disabled:text-workspace-muted"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-500 mb-1">Industry</label>
+                    <label className="block text-sm text-workspace-muted mb-1">Industry</label>
                     <select
                       value={profileData.industry}
                       onChange={(e) => setProfileData(prev => ({ ...prev, industry: e.target.value }))}
                       disabled={!profileEditMode}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                      className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none disabled:bg-workspace-field disabled:text-workspace-muted"
                     >
                       <option value="">Select industry...</option>
                       <option value="photography">Photography</option>
@@ -2094,13 +2062,13 @@ export default function Home() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-500 mb-1">Tax ID/EIN (optional)</label>
+                    <label className="block text-sm text-workspace-muted mb-1">Tax ID/EIN (optional)</label>
                     <input
                       type="text"
                       value={profileData.taxId}
                       onChange={(e) => setProfileData(prev => ({ ...prev, taxId: e.target.value }))}
                       disabled={!profileEditMode}
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                      className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none disabled:bg-workspace-field disabled:text-workspace-muted"
                     />
                   </div>
                 </div>
@@ -2108,137 +2076,137 @@ export default function Home() {
             </div>
 
             {/* Social Links */}
-            <div className="bg-white rounded-xl shadow-md p-8 mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Social Links</h2>
+            <div className="workspace-card p-8 mb-6">
+              <h2 className="text-2xl font-bold text-workspace-text mb-6">Social Links</h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Portfolio/Website</label>
+                  <label className="block text-sm text-workspace-muted mb-1">Portfolio/Website</label>
                   <input
                     type="url"
                     value={profileData.portfolioWebsite}
                     onChange={(e) => setProfileData(prev => ({ ...prev, portfolioWebsite: e.target.value }))}
                     disabled={!profileEditMode}
                     placeholder="https://yourportfolio.com"
-                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                    className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none disabled:bg-workspace-field disabled:text-workspace-muted"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Instagram</label>
+                  <label className="block text-sm text-workspace-muted mb-1">Instagram</label>
                   <input
                     type="text"
                     value={profileData.instagram}
                     onChange={(e) => setProfileData(prev => ({ ...prev, instagram: e.target.value }))}
                     disabled={!profileEditMode}
                     placeholder="@username"
-                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                    className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none disabled:bg-workspace-field disabled:text-workspace-muted"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Twitter/X</label>
+                  <label className="block text-sm text-workspace-muted mb-1">Twitter/X</label>
                   <input
                     type="text"
                     value={profileData.twitter}
                     onChange={(e) => setProfileData(prev => ({ ...prev, twitter: e.target.value }))}
                     disabled={!profileEditMode}
                     placeholder="@username"
-                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                    className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none disabled:bg-workspace-field disabled:text-workspace-muted"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">LinkedIn</label>
+                  <label className="block text-sm text-workspace-muted mb-1">LinkedIn</label>
                   <input
                     type="text"
                     value={profileData.linkedin}
                     onChange={(e) => setProfileData(prev => ({ ...prev, linkedin: e.target.value }))}
                     disabled={!profileEditMode}
                     placeholder="linkedin.com/in/username"
-                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                    className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none disabled:bg-workspace-field disabled:text-workspace-muted"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Other</label>
+                  <label className="block text-sm text-workspace-muted mb-1">Other</label>
                   <input
                     type="text"
                     value={profileData.other}
                     onChange={(e) => setProfileData(prev => ({ ...prev, other: e.target.value }))}
                     disabled={!profileEditMode}
-                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none disabled:bg-gray-50 disabled:text-gray-600"
+                    className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none disabled:bg-workspace-field disabled:text-workspace-muted"
                   />
                 </div>
               </div>
             </div>
 
             {/* Account Settings */}
-            <div className="bg-white rounded-xl shadow-md p-8 mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Account Settings</h2>
+            <div className="workspace-card p-8 mb-6">
+              <h2 className="text-2xl font-bold text-workspace-text mb-6">Account Settings</h2>
               <div className="space-y-2">
                 <button
                   onClick={handleChangePassword}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-all flex items-center justify-between group"
+                  className="w-full text-left px-4 py-3 hover:bg-workspace-field rounded-lg transition-all flex items-center justify-between group"
                 >
-                  <span className="text-gray-700 group-hover:text-[#FF8C42]">→ Change Password</span>
+                  <span className="text-workspace-text group-hover:text-workspace-accent">→ Change Password</span>
                 </button>
                 <button
                   onClick={() => handleAccountAction('2fa')}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-all flex items-center justify-between group"
+                  className="w-full text-left px-4 py-3 hover:bg-workspace-field rounded-lg transition-all flex items-center justify-between group"
                 >
-                  <span className="text-gray-700 group-hover:text-[#FF8C42]">→ Two-Factor Authentication</span>
+                  <span className="text-workspace-text group-hover:text-workspace-accent">→ Two-Factor Authentication</span>
                 </button>
                 <button
                   onClick={() => handleAccountAction('notifications')}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-all flex items-center justify-between group"
+                  className="w-full text-left px-4 py-3 hover:bg-workspace-field rounded-lg transition-all flex items-center justify-between group"
                 >
-                  <span className="text-gray-700 group-hover:text-[#FF8C42]">→ Email Notifications</span>
+                  <span className="text-workspace-text group-hover:text-workspace-accent">→ Email Notifications</span>
                 </button>
                 <button
                   onClick={() => handleAccountAction('privacy')}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-all flex items-center justify-between group"
+                  className="w-full text-left px-4 py-3 hover:bg-workspace-field rounded-lg transition-all flex items-center justify-between group"
                 >
-                  <span className="text-gray-700 group-hover:text-[#FF8C42]">→ Privacy Settings</span>
+                  <span className="text-workspace-text group-hover:text-workspace-accent">→ Privacy Settings</span>
                 </button>
                 <button
                   onClick={() => handleAccountAction('download')}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-all flex items-center justify-between group"
+                  className="w-full text-left px-4 py-3 hover:bg-workspace-field rounded-lg transition-all flex items-center justify-between group"
                 >
-                  <span className="text-gray-700 group-hover:text-[#FF8C42]">→ Download My Data</span>
+                  <span className="text-workspace-text group-hover:text-workspace-accent">→ Download My Data</span>
                 </button>
                 <button
                   onClick={() => handleAccountAction('delete')}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 rounded-lg transition-all flex items-center justify-between group"
+                  className="w-full text-left px-4 py-3 hover:bg-workspace-field rounded-lg transition-all flex items-center justify-between group"
                 >
-                  <span className="text-red-600 group-hover:text-red-700">→ Delete Account</span>
+                  <span className="text-red-300 group-hover:text-red-200">→ Delete Account</span>
                 </button>
               </div>
             </div>
 
             {/* Subscription/Account Tier */}
-            <div className="bg-white rounded-xl shadow-md p-8 mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Subscription</h2>
+            <div className="workspace-card p-8 mb-6">
+              <h2 className="text-2xl font-bold text-workspace-text mb-6">Subscription</h2>
               {profileData.accountType === 'free' ? (
                 <>
                   <div className="mb-6">
-                    <div className="text-lg font-semibold text-gray-800 mb-4">Current Plan: Free</div>
+                    <div className="text-lg font-semibold text-workspace-text mb-4">Current Plan: Free</div>
                     <div className="space-y-2">
-                      <div className="flex items-center text-gray-600">
+                      <div className="flex items-center text-workspace-muted">
                         <span className="text-green-500 mr-2">✓</span> Unlimited file protection
                       </div>
-                      <div className="flex items-center text-gray-600">
+                      <div className="flex items-center text-workspace-muted">
                         <span className="text-green-500 mr-2">✓</span> Certificate generation
                       </div>
-                      <div className="flex items-center text-gray-400">
-                        <span className="text-gray-300 mr-2">✗</span> Advanced monitoring
+                      <div className="flex items-center text-workspace-muted">
+                        <span className="text-workspace-muted mr-2">✗</span> Advanced monitoring
                       </div>
-                      <div className="flex items-center text-gray-400">
-                        <span className="text-gray-300 mr-2">✗</span> Case management
+                      <div className="flex items-center text-workspace-muted">
+                        <span className="text-workspace-muted mr-2">✗</span> Case management
                       </div>
-                      <div className="flex items-center text-gray-400">
-                        <span className="text-gray-300 mr-2">✗</span> Priority support
+                      <div className="flex items-center text-workspace-muted">
+                        <span className="text-workspace-muted mr-2">✗</span> Priority support
                       </div>
                     </div>
                   </div>
                   <button
                     onClick={handleUpgradeToPro}
-                    className="w-full bg-[#FF8C42] hover:bg-[#ff7a2e] text-white font-bold py-3 px-6 rounded-lg transition-all hover:shadow-lg"
+                    className="w-full bg-[#FF8C42]  text-white font-bold py-3 px-6 rounded-lg transition-all hover:shadow-lg"
                   >
                     Upgrade to Pro →
                   </button>
@@ -2246,15 +2214,15 @@ export default function Home() {
               ) : (
                 <>
                   <div className="mb-6">
-                    <div className="text-lg font-semibold text-gray-800 mb-2">Current Plan: Pro</div>
-                    <div className="text-gray-600 mb-1">Billing: $29/month</div>
-                    <div className="text-gray-600">Next billing date: Dec 15, 2025</div>
+                    <div className="text-lg font-semibold text-workspace-text mb-2">Current Plan: Pro</div>
+                    <div className="text-workspace-muted mb-1">Billing: $29/month</div>
+                    <div className="text-workspace-muted">Next billing date: Dec 15, 2025</div>
                   </div>
                   <div className="flex gap-4">
-                    <button className="flex-1 bg-white border-2 border-[#FF8C42] text-[#FF8C42] hover:bg-orange-50 font-semibold py-3 px-6 rounded-lg transition-all">
+                    <button className="flex-1 bg-workspace-panel border-2 border-workspace-accent text-workspace-accent hover:bg-workspace-highlight font-semibold py-3 px-6 rounded-lg transition-all">
                       Manage Subscription
                     </button>
-                    <button className="flex-1 bg-white border-2 border-gray-300 text-gray-600 hover:bg-gray-50 font-semibold py-3 px-6 rounded-lg transition-all">
+                    <button className="flex-1 bg-workspace-panel border-2 border-workspace-border text-workspace-muted hover:bg-workspace-field font-semibold py-3 px-6 rounded-lg transition-all">
                       View Invoices
                     </button>
                   </div>
@@ -2266,88 +2234,54 @@ export default function Home() {
 
         {/* SETTINGS PAGE */}
         {currentPage === 'settings' && (
-          <div className="flex h-[calc(100vh-70px)] bg-gray-50">
-            {/* Settings Submenu */}
-            <div className="w-60 bg-white border-r border-gray-200 p-8 overflow-y-auto">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Settings</h2>
-              <nav className="space-y-1">
+          <section>
+            <div className="workspace-tabs">
+              <nav aria-label="Settings sections">
                 <button
                   onClick={() => setSettingsSection('account')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                    settingsSection === 'account'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={settingsSection === 'account' ? 'true' : undefined}
                 >
                   Account
                 </button>
                 <button
                   onClick={() => setSettingsSection('wallet')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                    settingsSection === 'wallet'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={settingsSection === 'wallet' ? 'true' : undefined}
                 >
                   Ownership Wallet
                 </button>
                 <button
                   onClick={() => setSettingsSection('security')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                    settingsSection === 'security'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={settingsSection === 'security' ? 'true' : undefined}
                 >
                   Security
                 </button>
                 <button
                   onClick={() => setSettingsSection('privacy')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                    settingsSection === 'privacy'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={settingsSection === 'privacy' ? 'true' : undefined}
                 >
                   Privacy
                 </button>
                 <button
                   onClick={() => setSettingsSection('notifications')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                    settingsSection === 'notifications'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={settingsSection === 'notifications' ? 'true' : undefined}
                 >
                   Notifications
                 </button>
                 <button
                   onClick={() => setSettingsSection('billing')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                    settingsSection === 'billing'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={settingsSection === 'billing' ? 'true' : undefined}
                 >
                   Billing
                 </button>
                 <button
                   onClick={() => setSettingsSection('data')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                    settingsSection === 'data'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={settingsSection === 'data' ? 'true' : undefined}
                 >
                   Data & Export
                 </button>
                 <button
                   onClick={() => setSettingsSection('advanced')}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
-                    settingsSection === 'advanced'
-                      ? 'bg-orange-50 text-[#FF8C42] border-l-4 border-[#FF8C42] font-semibold'
-                      : 'text-gray-600 border-transparent hover:bg-gray-50'
-                  }`}
+                  aria-current={settingsSection === 'advanced' ? 'true' : undefined}
                 >
                   Advanced
                 </button>
@@ -2355,17 +2289,17 @@ export default function Home() {
             </div>
 
             {/* Settings Main Content */}
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="mx-auto max-w-7xl p-4 sm:p-8">
               {/* ACCOUNT SECTION */}
               {settingsSection === 'account' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Account Settings</h1>
-                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Profile Information</h3>
-                    <p className="text-gray-600">Manage your account details and preferences.</p>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Account Settings</h1>
+                  <div className="workspace-card p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Profile Information</h3>
+                    <p className="text-workspace-muted">Manage your account details and preferences.</p>
                     <button
                       onClick={() => setCurrentPage('profile')}
-                      className="mt-4 bg-[#FF8C42] text-white px-6 py-2 rounded-lg hover:bg-[#ff7a2e] transition-all"
+                      className="mt-4 workspace-action px-6 py-2 rounded-lg  transition-all"
                     >
                       Go to Profile →
                     </button>
@@ -2376,14 +2310,14 @@ export default function Home() {
               {/* OWNERSHIP WALLET SECTION */}
               {settingsSection === 'wallet' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-4">Ownership Wallet</h1>
-                  <p className="text-gray-600 mb-8">Your permanent proof of ownership on the blockchain</p>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-4">Ownership Wallet</h1>
+                  <p className="text-workspace-muted mb-8">Your permanent proof of ownership on the blockchain</p>
 
                   {/* Wallet Address Card */}
-                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Your Wallet Address</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                      <code className="text-sm font-mono text-gray-800 break-all">
+                  <div className="workspace-card p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Your Wallet Address</h3>
+                    <div className="bg-workspace-field p-4 rounded-lg mb-4">
+                      <code className="text-sm font-mono text-workspace-text break-all">
                         {userWallet?.address || 'No wallet generated yet'}
                       </code>
                     </div>
@@ -2393,7 +2327,7 @@ export default function Home() {
                           navigator.clipboard.writeText(userWallet.address);
                           showToastMessage('📋 Wallet address copied!', 'success');
                         }}
-                        className="bg-[#FF8C42] text-white px-6 py-2 rounded-lg hover:bg-[#ff7a2e] transition-all"
+                        className="workspace-action px-6 py-2 rounded-lg  transition-all"
                       >
                         📋 Copy Address
                       </button>
@@ -2401,11 +2335,11 @@ export default function Home() {
                   </div>
 
                   {/* Recovery Phrase Card */}
-                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Recovery Phrase</h3>
-                    <div className="bg-[#FFF5F0] border-2 border-[#FF8C42] p-4 rounded-lg mb-4">
-                      <p className="text-[#FF8C42] font-semibold mb-2">⚠️ CRITICAL: Keep This Safe</p>
-                      <p className="text-gray-700 text-sm">
+                  <div className="workspace-card p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Recovery Phrase</h3>
+                    <div className="bg-workspace-highlight border-2 border-workspace-accent p-4 rounded-lg mb-4">
+                      <p className="text-workspace-accent font-semibold mb-2">⚠️ CRITICAL: Keep This Safe</p>
+                      <p className="text-workspace-text text-sm">
                         Your 12-word recovery phrase is the ONLY way to prove ownership if BloomShield shuts down.
                         Never share it with anyone.
                       </p>
@@ -2422,7 +2356,7 @@ export default function Home() {
                             alert(`Your Recovery Phrase:\n\n${userWallet.seedPhrase}\n\nStore this safely offline!`);
                           }
                         }}
-                        className="bg-white border-2 border-[#FF8C42] text-[#FF8C42] px-6 py-2 rounded-lg hover:bg-orange-50 transition-all"
+                        className="bg-workspace-panel border-2 border-workspace-accent text-workspace-accent px-6 py-2 rounded-lg hover:bg-workspace-highlight transition-all"
                       >
                         🔑 View Recovery Phrase
                       </button>
@@ -2430,22 +2364,22 @@ export default function Home() {
                   </div>
 
                   {/* Protected Assets Card */}
-                  <div className="bg-white rounded-xl shadow-md p-6">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Protected Assets</h3>
+                  <div className="workspace-card p-6">
+                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Protected Assets</h3>
                     {protectedFiles.length === 0 ? (
-                      <p className="text-gray-500">No protected assets yet</p>
+                      <p className="text-workspace-muted">No protected assets yet</p>
                     ) : (
                       <div className="space-y-3">
                         {protectedFiles.map((file, index) => (
                           <div
                             key={index}
-                            className="bg-gray-50 p-4 rounded-lg flex justify-between items-center"
+                            className="bg-workspace-field p-4 rounded-lg flex justify-between items-center"
                           >
                             <div>
-                              <p className="font-semibold text-gray-800">{file.fileName}</p>
-                              <p className="text-gray-500 text-sm font-mono">{file.assetId}</p>
+                              <p className="font-semibold text-workspace-text">{file.fileName}</p>
+                              <p className="text-workspace-muted text-sm font-mono">{file.assetId}</p>
                             </div>
-                            <span className="text-green-600 text-sm font-semibold">● Protected</span>
+                            <span className="text-emerald-300 text-sm font-semibold">● Protected</span>
                           </div>
                         ))}
                       </div>
@@ -2453,9 +2387,9 @@ export default function Home() {
                   </div>
 
                   {/* Blockchain Info */}
-                  <div className="bg-[#E8F5E9] border-l-4 border-green-500 p-6 rounded-lg mt-6">
-                    <h4 className="font-semibold text-gray-800 mb-2">✓ Permanent Protection</h4>
-                    <p className="text-gray-700 text-sm">
+                  <div className="bg-emerald-950/60 border-l-4 border-green-500 p-6 rounded-lg mt-6">
+                    <h4 className="font-semibold text-workspace-text mb-2">✓ Permanent Protection</h4>
+                    <p className="text-workspace-text text-sm">
                       Your ownership records exist on the blockchain forever, completely independent of BloomShield.
                       Even if our service disappears, your proof of ownership remains permanent and verifiable.
                     </p>
@@ -2466,13 +2400,13 @@ export default function Home() {
               {/* SECURITY SECTION */}
               {settingsSection === 'security' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-4">Security</h1>
-                  <p className="text-gray-600 mb-8">Manage your account security and authentication</p>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-4">Security</h1>
+                  <p className="text-workspace-muted mb-8">Manage your account security and authentication</p>
 
                   {/* Password Card */}
-                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Password</h3>
-                    <p className="text-gray-600 mb-4">Update your password regularly to keep your account secure</p>
+                  <div className="workspace-card p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Password</h3>
+                    <p className="text-workspace-muted mb-4">Update your password regularly to keep your account secure</p>
                     <button
                       onClick={() => {
                         const newPassword = prompt('Enter new password (minimum 8 characters):');
@@ -2483,25 +2417,25 @@ export default function Home() {
                           showToastMessage('⚠️ Password must be at least 8 characters', 'warning');
                         }
                       }}
-                      className="bg-[#FF8C42] text-white px-6 py-2 rounded-lg hover:bg-[#ff7a2e] transition-all"
+                      className="workspace-action px-6 py-2 rounded-lg  transition-all"
                     >
                       Change Password
                     </button>
                   </div>
 
                   {/* 2FA Card */}
-                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Two-Factor Authentication</h3>
+                  <div className="workspace-card p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Two-Factor Authentication</h3>
                     <div className="flex justify-between items-center mb-4">
                       <div>
-                        <p className="text-gray-800 font-semibold">
+                        <p className="text-workspace-text font-semibold">
                           Status: {twoFactorEnabled ? (
-                            <span className="text-green-600">✓ Enabled</span>
+                            <span className="text-emerald-300">✓ Enabled</span>
                           ) : (
-                            <span className="text-gray-500">Not enabled</span>
+                            <span className="text-workspace-muted">Not enabled</span>
                           )}
                         </p>
-                        <p className="text-gray-600 text-sm mt-1">
+                        <p className="text-workspace-muted text-sm mt-1">
                           Add an extra layer of security to your account
                         </p>
                       </div>
@@ -2516,14 +2450,14 @@ export default function Home() {
                               showToastMessage('🔓 Two-factor authentication disabled', 'success');
                             }
                           }}
-                          className="bg-white border-2 border-gray-300 text-gray-600 px-6 py-2 rounded-lg hover:bg-gray-50 transition-all"
+                          className="bg-workspace-panel border-2 border-workspace-border text-workspace-muted px-6 py-2 rounded-lg hover:bg-workspace-field transition-all"
                         >
                           Disable 2FA
                         </button>
                       ) : (
                         <button
                           onClick={() => setShow2FASetup(!show2FASetup)}
-                          className="bg-[#FF8C42] text-white px-6 py-2 rounded-lg hover:bg-[#ff7a2e] transition-all"
+                          className="workspace-action px-6 py-2 rounded-lg  transition-all"
                         >
                           Enable 2FA
                         </button>
@@ -2533,27 +2467,27 @@ export default function Home() {
                     {/* 2FA Setup UI */}
                     {show2FASetup && !twoFactorEnabled && (
                       <div className="border-t pt-4 mt-4">
-                        <h4 className="font-semibold text-gray-800 mb-4">Set Up Authenticator App</h4>
-                        <ol className="text-sm text-gray-700 space-y-2 mb-4">
+                        <h4 className="font-semibold text-workspace-text mb-4">Set Up Authenticator App</h4>
+                        <ol className="text-sm text-workspace-text space-y-2 mb-4">
                           <li>1. Download an authenticator app (Google Authenticator, Authy, etc.)</li>
                           <li>2. Scan this QR code with your app:</li>
                         </ol>
-                        <div className="bg-gray-100 p-8 rounded-lg text-center mb-4">
+                        <div className="bg-workspace-field p-8 rounded-lg text-center mb-4">
                           <div className="text-6xl">📱</div>
-                          <p className="text-sm text-gray-500 mt-2">QR Code Placeholder</p>
-                          <p className="text-xs text-gray-400 mt-1">In production: Display actual QR code</p>
+                          <p className="text-sm text-workspace-muted mt-2">QR Code Placeholder</p>
+                          <p className="text-xs text-workspace-muted mt-1">In production: Display actual QR code</p>
                         </div>
-                        <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                          <p className="text-xs text-gray-500 mb-2">Or enter this code manually:</p>
-                          <code className="text-sm font-mono text-gray-800">ABCD-EFGH-IJKL-MNOP</code>
+                        <div className="bg-workspace-field p-4 rounded-lg mb-4">
+                          <p className="text-xs text-workspace-muted mb-2">Or enter this code manually:</p>
+                          <code className="text-sm font-mono text-workspace-text">ABCD-EFGH-IJKL-MNOP</code>
                         </div>
                         <div className="mb-4">
-                          <label className="block text-sm text-gray-700 mb-2">Enter 6-digit code from your app:</label>
+                          <label className="block text-sm text-workspace-text mb-2">Enter 6-digit code from your app:</label>
                           <input
                             type="text"
                             maxLength={6}
                             placeholder="000000"
-                            className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none"
+                            className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none"
                             id="twoFactorCode"
                           />
                         </div>
@@ -2569,7 +2503,7 @@ export default function Home() {
                               showToastMessage('⚠️ Please enter a 6-digit code', 'warning');
                             }
                           }}
-                          className="w-full bg-[#FF8C42] text-white py-3 rounded-lg hover:bg-[#ff7a2e] transition-all font-semibold"
+                          className="w-full workspace-action py-3 rounded-lg  transition-all font-semibold"
                         >
                           Verify & Enable 2FA
                         </button>
@@ -2578,22 +2512,22 @@ export default function Home() {
                   </div>
 
                   {/* Sessions Card */}
-                  <div className="bg-white rounded-xl shadow-md p-6">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Active Sessions</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                  <div className="workspace-card p-6">
+                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Active Sessions</h3>
+                    <div className="bg-workspace-field p-4 rounded-lg mb-4">
                       <div className="flex justify-between items-center">
                         <div>
-                          <p className="font-semibold text-gray-800">Current Session</p>
-                          <p className="text-sm text-gray-600">Chrome on Windows • Last active: Now</p>
+                          <p className="font-semibold text-workspace-text">Current Session</p>
+                          <p className="text-sm text-workspace-muted">Chrome on Windows • Last active: Now</p>
                         </div>
-                        <span className="text-green-600 text-sm">● Active</span>
+                        <span className="text-emerald-300 text-sm">● Active</span>
                       </div>
                     </div>
                     <button
                       onClick={() => {
                         showToastMessage('🔐 All other sessions signed out', 'success');
                       }}
-                      className="w-full bg-white border-2 border-[#FF8C42] text-[#FF8C42] py-2 rounded-lg hover:bg-orange-50 transition-all"
+                      className="w-full bg-workspace-panel border-2 border-workspace-accent text-workspace-accent py-2 rounded-lg hover:bg-workspace-highlight transition-all"
                     >
                       Sign Out All Other Sessions
                     </button>
@@ -2604,17 +2538,17 @@ export default function Home() {
               {/* PRIVACY SECTION */}
               {settingsSection === 'privacy' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-4">Privacy</h1>
-                  <p className="text-gray-600 mb-8">Control who can see your profile and content</p>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-4">Privacy</h1>
+                  <p className="text-workspace-muted mb-8">Control who can see your profile and content</p>
 
                   {/* Profile Visibility Card */}
-                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Profile Visibility</h3>
+                  <div className="workspace-card p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Profile Visibility</h3>
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
                         <div>
-                          <p className="font-semibold text-gray-800">Public Profile</p>
-                          <p className="text-sm text-gray-600">Allow others to view your profile</p>
+                          <p className="font-semibold text-workspace-text">Public Profile</p>
+                          <p className="text-sm text-workspace-muted">Allow others to view your profile</p>
                         </div>
                         <label className="relative inline-block w-12 h-6">
                           <input
@@ -2628,14 +2562,14 @@ export default function Home() {
                               );
                             }}
                           />
-                          <span className="absolute cursor-pointer inset-0 bg-gray-300 rounded-full transition-all peer-checked:bg-[#FF8C42] peer-focus:ring-2 peer-focus:ring-[#FF8C42]/50"></span>
-                          <span className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all peer-checked:translate-x-6"></span>
+                          <span className="absolute cursor-pointer inset-0 bg-workspace-hover rounded-full transition-all peer-checked:bg-[#FF8C42] peer-focus:ring-2 peer-focus:ring-[#FF8C42]/50"></span>
+                          <span className="absolute left-1 top-1 w-4 h-4 bg-workspace-panel rounded-full transition-all peer-checked:translate-x-6"></span>
                         </label>
                       </div>
                       <div className="flex justify-between items-center">
                         <div>
-                          <p className="font-semibold text-gray-800">Show in Search Results</p>
-                          <p className="text-sm text-gray-600">Allow your profile to appear in searches</p>
+                          <p className="font-semibold text-workspace-text">Show in Search Results</p>
+                          <p className="text-sm text-workspace-muted">Allow your profile to appear in searches</p>
                         </div>
                         <label className="relative inline-block w-12 h-6">
                           <input
@@ -2650,8 +2584,8 @@ export default function Home() {
                               );
                             }}
                           />
-                          <span className="absolute cursor-pointer inset-0 bg-gray-300 rounded-full transition-all peer-checked:bg-[#FF8C42] peer-focus:ring-2 peer-focus:ring-[#FF8C42]/50"></span>
-                          <span className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all peer-checked:translate-x-6"></span>
+                          <span className="absolute cursor-pointer inset-0 bg-workspace-hover rounded-full transition-all peer-checked:bg-[#FF8C42] peer-focus:ring-2 peer-focus:ring-[#FF8C42]/50"></span>
+                          <span className="absolute left-1 top-1 w-4 h-4 bg-workspace-panel rounded-full transition-all peer-checked:translate-x-6"></span>
                         </label>
                       </div>
                     </div>
@@ -2662,12 +2596,12 @@ export default function Home() {
               {/* NOTIFICATIONS SECTION */}
               {settingsSection === 'notifications' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-4">Notifications</h1>
-                  <p className="text-gray-600 mb-8">Manage your notification preferences</p>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-4">Notifications</h1>
+                  <p className="text-workspace-muted mb-8">Manage your notification preferences</p>
 
                   {/* Email Notifications Card */}
-                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Email Notifications</h3>
+                  <div className="workspace-card p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Email Notifications</h3>
                     <div className="space-y-4">
                       {[
                         { key: 'fileProtected', label: 'File Protection Confirmations', desc: 'Receive confirmation when files are protected' },
@@ -2678,8 +2612,8 @@ export default function Home() {
                       ].map(({ key, label, desc }) => (
                         <div key={key} className="flex justify-between items-center">
                           <div>
-                            <p className="font-semibold text-gray-800">{label}</p>
-                            <p className="text-sm text-gray-600">{desc}</p>
+                            <p className="font-semibold text-workspace-text">{label}</p>
+                            <p className="text-sm text-workspace-muted">{desc}</p>
                           </div>
                           <label className="relative inline-block w-12 h-6">
                             <input
@@ -2691,8 +2625,8 @@ export default function Home() {
                                 showToastMessage('✓ Notification preference updated', 'success');
                               }}
                             />
-                            <span className="absolute cursor-pointer inset-0 bg-gray-300 rounded-full transition-all peer-checked:bg-[#FF8C42] peer-focus:ring-2 peer-focus:ring-[#FF8C42]/50"></span>
-                            <span className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all peer-checked:translate-x-6"></span>
+                            <span className="absolute cursor-pointer inset-0 bg-workspace-hover rounded-full transition-all peer-checked:bg-[#FF8C42] peer-focus:ring-2 peer-focus:ring-[#FF8C42]/50"></span>
+                            <span className="absolute left-1 top-1 w-4 h-4 bg-workspace-panel rounded-full transition-all peer-checked:translate-x-6"></span>
                           </label>
                         </div>
                       ))}
@@ -2704,13 +2638,13 @@ export default function Home() {
               {/* BILLING SECTION */}
               {settingsSection === 'billing' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-8">Billing & Subscription</h1>
-                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Current Plan</h3>
-                    <p className="text-gray-600 mb-4">Manage your subscription and billing information</p>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Billing & Subscription</h1>
+                  <div className="workspace-card p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Current Plan</h3>
+                    <p className="text-workspace-muted mb-4">Manage your subscription and billing information</p>
                     <button
                       onClick={() => setCurrentPage('wallet')}
-                      className="bg-[#FF8C42] text-white px-6 py-2 rounded-lg hover:bg-[#ff7a2e] transition-all"
+                      className="workspace-action px-6 py-2 rounded-lg  transition-all"
                     >
                       Go to Wallet →
                     </button>
@@ -2721,13 +2655,13 @@ export default function Home() {
               {/* DATA & EXPORT SECTION */}
               {settingsSection === 'data' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-4">Data & Export</h1>
-                  <p className="text-gray-600 mb-8">Download your data and manage account information</p>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-4">Data & Export</h1>
+                  <p className="text-workspace-muted mb-8">Download your data and manage account information</p>
 
                   {/* Data Export Card */}
-                  <div className="bg-white rounded-xl shadow-md p-6">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">Export Your Data</h3>
-                    <p className="text-gray-600 mb-6">Download a copy of all your BloomShield data</p>
+                  <div className="workspace-card p-6">
+                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Export Your Data</h3>
+                    <p className="text-workspace-muted mb-6">Download a copy of all your BloomShield data</p>
                     <button
                       onClick={() => {
                         const exportData = {
@@ -2754,7 +2688,7 @@ export default function Home() {
 
                         showToastMessage('✅ Data exported successfully!', 'success');
                       }}
-                      className="bg-[#FF8C42] text-white px-6 py-3 rounded-lg hover:bg-[#ff7a2e] transition-all font-semibold"
+                      className="workspace-action px-6 py-3 rounded-lg  transition-all font-semibold"
                     >
                       📥 Download My Data
                     </button>
@@ -2765,24 +2699,24 @@ export default function Home() {
               {/* ADVANCED SECTION */}
               {settingsSection === 'advanced' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-gray-800 mb-4">Advanced Settings</h1>
-                  <p className="text-gray-600 mb-8">API access and account management</p>
+                  <h1 className="text-4xl font-bold text-workspace-text mb-4">Advanced Settings</h1>
+                  <p className="text-workspace-muted mb-8">API access and account management</p>
 
                   {/* API Keys Card */}
-                  <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-4">API Keys</h3>
-                    <p className="text-gray-600 mb-4">Manage API keys for programmatic access</p>
+                  <div className="workspace-card p-6 mb-6">
+                    <h3 className="text-xl font-semibold text-workspace-text mb-4">API Keys</h3>
+                    <p className="text-workspace-muted mb-4">Manage API keys for programmatic access</p>
 
                     {apiKeys.length === 0 ? (
-                      <p className="text-gray-500 text-sm mb-4">No API keys yet</p>
+                      <p className="text-workspace-muted text-sm mb-4">No API keys yet</p>
                     ) : (
                       <div className="space-y-3 mb-4">
                         {apiKeys.map((key) => (
-                          <div key={key.id} className="bg-gray-50 p-4 rounded-lg flex justify-between items-center">
+                          <div key={key.id} className="bg-workspace-field p-4 rounded-lg flex justify-between items-center">
                             <div>
-                              <p className="font-semibold text-gray-800">{key.name}</p>
-                              <p className="text-sm text-gray-500">Created: {key.created}</p>
-                              <code className="text-xs font-mono text-gray-600">{key.key.substring(0, 20)}...</code>
+                              <p className="font-semibold text-workspace-text">{key.name}</p>
+                              <p className="text-sm text-workspace-muted">Created: {key.created}</p>
+                              <code className="text-xs font-mono text-workspace-muted">{key.key.substring(0, 20)}...</code>
                             </div>
                             <button
                               onClick={() => {
@@ -2794,7 +2728,7 @@ export default function Home() {
                                   showToastMessage('🗑️ API key revoked', 'success');
                                 }
                               }}
-                              className="bg-red-50 text-red-600 px-4 py-2 rounded-lg hover:bg-red-100 transition-all text-sm"
+                              className="bg-red-950/60 text-red-300 px-4 py-2 rounded-lg hover:bg-red-900/60 transition-all text-sm"
                             >
                               Revoke
                             </button>
@@ -2825,25 +2759,25 @@ export default function Home() {
                           showToastMessage('✅ API key created', 'success');
                         }
                       }}
-                      className="bg-[#FF8C42] text-white px-6 py-2 rounded-lg hover:bg-[#ff7a2e] transition-all"
+                      className="workspace-action px-6 py-2 rounded-lg  transition-all"
                     >
                       + Generate New API Key
                     </button>
                   </div>
 
                   {/* Danger Zone Card */}
-                  <div className="bg-white rounded-xl shadow-md border-2 border-red-200 p-6">
-                    <h3 className="text-xl font-semibold text-red-600 mb-4">⚠️ Danger Zone</h3>
+                  <div className="workspace-card border-2 border-red-800 p-6">
+                    <h3 className="text-xl font-semibold text-red-300 mb-4">⚠️ Danger Zone</h3>
 
-                    <div className="bg-[#E8F5E9] border-l-4 border-green-500 p-4 rounded-lg mb-6">
-                      <p className="text-sm font-semibold text-gray-800 mb-1">✓ Important: Blockchain Protection</p>
-                      <p className="text-xs text-gray-700">
+                    <div className="bg-emerald-950/60 border-l-4 border-green-500 p-4 rounded-lg mb-6">
+                      <p className="text-sm font-semibold text-workspace-text mb-1">✓ Important: Blockchain Protection</p>
+                      <p className="text-xs text-workspace-text">
                         Deleting your BloomShield account will NOT delete your blockchain records.
                         Your ownership proofs remain permanent and verifiable forever through your wallet address.
                       </p>
                     </div>
 
-                    <p className="text-gray-700 mb-4">
+                    <p className="text-workspace-text mb-4">
                       This will permanently delete your account, profile data, and remove access to the BloomShield platform.
                       This action cannot be undone.
                     </p>
@@ -2874,8 +2808,9 @@ export default function Home() {
                 </div>
               )}
             </div>
-          </div>
+          </section>
         )}
+        </main>
       </div>
 
       {/* Processing Overlay */}
@@ -2900,46 +2835,46 @@ export default function Home() {
           onClick={handlePasswordModalClose}
         >
           <div
-            className="bg-white w-[90%] max-w-md rounded-2xl p-8 shadow-2xl animate-slideUp"
+            className="bg-workspace-panel w-[90%] max-w-md rounded-2xl p-8 shadow-2xl animate-slideUp"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Change Password</h2>
+            <h2 className="text-2xl font-bold text-workspace-text mb-6">Change Password</h2>
             <div className="space-y-4 mb-6">
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Current Password</label>
+                <label className="block text-sm text-workspace-muted mb-1">Current Password</label>
                 <input
                   type="password"
                   placeholder="Enter current password"
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none"
+                  className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-500 mb-1">New Password</label>
+                <label className="block text-sm text-workspace-muted mb-1">New Password</label>
                 <input
                   type="password"
                   placeholder="Enter new password"
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none"
+                  className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Confirm New Password</label>
+                <label className="block text-sm text-workspace-muted mb-1">Confirm New Password</label>
                 <input
                   type="password"
                   placeholder="Confirm new password"
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#FF8C42] focus:outline-none"
+                  className="w-full px-4 py-2 border-2 border-workspace-border rounded-lg focus:border-workspace-accent focus:outline-none"
                 />
               </div>
             </div>
             <div className="flex gap-3">
               <button
                 onClick={handlePasswordModalClose}
-                className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-all font-semibold"
+                className="flex-1 px-4 py-2 border-2 border-workspace-border text-workspace-muted rounded-lg hover:bg-workspace-field transition-all font-semibold"
               >
                 Cancel
               </button>
               <button
                 onClick={handlePasswordChange}
-                className="flex-1 px-4 py-2 bg-[#FF8C42] text-white rounded-lg hover:bg-[#ff7a2e] transition-all font-semibold"
+                className="flex-1 px-4 py-2 workspace-action rounded-lg  transition-all font-semibold"
               >
                 Change Password
               </button>
@@ -2951,35 +2886,35 @@ export default function Home() {
       {/* Seed Phrase Modal - Shows on first login */}
       {showSeedPhraseModal && userWallet && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[3000] p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl relative">
+          <div className="bg-workspace-panel rounded-2xl p-8 max-w-2xl w-full shadow-2xl relative">
             {/* Close button */}
             <button
               onClick={() => {
                 setShowSeedPhraseModal(false);
                 setSeedPhraseAcknowledged(false);
               }}
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-all"
+              className="absolute top-4 right-4 text-workspace-muted hover:text-workspace-text text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-workspace-field transition-all"
             >
               ×
             </button>
 
             <div className="text-center mb-6">
               <div className="text-6xl mb-4">🔑</div>
-              <h2 className="text-3xl font-bold text-gray-800 mb-2">Your Ownership Wallet Created</h2>
-              <p className="text-gray-600">This is your permanent proof of ownership</p>
+              <h2 className="text-3xl font-bold text-workspace-text mb-2">Your Ownership Wallet Created</h2>
+              <p className="text-workspace-muted">This is your permanent proof of ownership</p>
             </div>
 
-            <div className="bg-[#FFF5F0] border-2 border-[#FF8C42] p-4 rounded-lg mb-6">
-              <p className="text-[#FF8C42] font-semibold mb-2">⚠️ CRITICAL: Save This Recovery Phrase</p>
-              <p className="text-gray-700 text-sm">
+            <div className="bg-workspace-highlight border-2 border-workspace-accent p-4 rounded-lg mb-6">
+              <p className="text-workspace-accent font-semibold mb-2">⚠️ CRITICAL: Save This Recovery Phrase</p>
+              <p className="text-workspace-text text-sm">
                 This is the ONLY way to prove ownership if BloomShield ever shuts down. We cannot recover it for you.
               </p>
             </div>
 
-            <div className="bg-gray-50 p-6 rounded-lg mb-6">
-              <p className="text-gray-500 text-sm mb-4">Your 12-word recovery phrase:</p>
-              <div className="bg-white p-4 rounded-lg mb-4">
-                <code className="font-mono text-base text-gray-800 break-words leading-loose">
+            <div className="bg-workspace-field p-6 rounded-lg mb-6">
+              <p className="text-workspace-muted text-sm mb-4">Your 12-word recovery phrase:</p>
+              <div className="bg-workspace-panel p-4 rounded-lg mb-4">
+                <code className="font-mono text-base text-workspace-text break-words leading-loose">
                   {userWallet.seedPhrase}
                 </code>
               </div>
@@ -2988,15 +2923,15 @@ export default function Home() {
                   navigator.clipboard.writeText(userWallet.seedPhrase);
                   showToastMessage('📋 Recovery phrase copied!', 'success');
                 }}
-                className="w-full bg-white border-2 border-[#FF8C42] text-[#FF8C42] py-3 rounded-lg font-semibold hover:bg-orange-50 transition-all"
+                className="w-full bg-workspace-panel border-2 border-workspace-accent text-workspace-accent py-3 rounded-lg font-semibold hover:bg-workspace-highlight transition-all"
               >
                 📋 Copy to Clipboard
               </button>
             </div>
 
-            <div className="bg-[#E8F5E9] border-l-4 border-green-500 p-4 rounded-lg mb-6">
-              <p className="font-semibold text-gray-800 mb-2">✓ Why This Matters:</p>
-              <p className="text-gray-700 text-sm">
+            <div className="bg-emerald-950/60 border-l-4 border-green-500 p-4 rounded-lg mb-6">
+              <p className="font-semibold text-workspace-text mb-2">✓ Why This Matters:</p>
+              <p className="text-workspace-text text-sm">
                 Even if BloomShield disappears, your blockchain records remain forever. This phrase is your key to prove
                 ownership of all your protected work.
               </p>
@@ -3008,9 +2943,9 @@ export default function Home() {
                   type="checkbox"
                   checked={seedPhraseAcknowledged}
                   onChange={(e) => setSeedPhraseAcknowledged(e.target.checked)}
-                  className="w-5 h-5 mr-3 cursor-pointer accent-[#FF8C42]"
+                  className="w-5 h-5 mr-3 cursor-pointer accent-workspace-accent"
                 />
-                <span className="text-gray-700">I have written down my recovery phrase in a safe place</span>
+                <span className="text-workspace-text">I have written down my recovery phrase in a safe place</span>
               </label>
             </div>
 
@@ -3024,8 +2959,8 @@ export default function Home() {
                 showToastMessage('✅ Wallet created! Your ownership is now permanent.', 'success');
               }}
               className={seedPhraseAcknowledged
-                ? 'w-full bg-[#FF8C42] text-white py-4 rounded-lg font-bold text-lg cursor-pointer hover:bg-[#ff7a2e] transition-all'
-                : 'w-full bg-gray-300 text-white py-4 rounded-lg font-bold text-lg cursor-not-allowed'}
+                ? 'w-full workspace-action py-4 rounded-lg font-bold text-lg cursor-pointer  transition-all'
+                : 'w-full bg-workspace-hover text-white py-4 rounded-lg font-bold text-lg cursor-not-allowed'}
             >
               Continue to Dashboard
             </button>
@@ -3046,20 +2981,20 @@ export default function Home() {
       {/* Listing Modal */}
       {showListingModal && assetToList && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[3000] p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl relative">
+          <div className="bg-workspace-panel rounded-2xl p-8 max-w-2xl w-full shadow-2xl relative">
             {/* Close button */}
             <button
               onClick={() => {
                 setShowListingModal(false);
                 setAssetToList(null);
               }}
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl"
+              className="absolute top-4 right-4 text-workspace-muted hover:text-workspace-text text-2xl"
             >
               ×
             </button>
 
-            <h2 className="text-3xl font-bold text-gray-800 mb-2">List {assetToList.fileName} on Marketplace</h2>
-            <p className="text-gray-600 mb-6">Set your pricing and license terms</p>
+            <h2 className="text-3xl font-bold text-workspace-text mb-2">List {assetToList.fileName} on Marketplace</h2>
+            <p className="text-workspace-muted mb-6">Set your pricing and license terms</p>
 
             <form
               onSubmit={(e) => {
@@ -3080,7 +3015,7 @@ export default function Home() {
             >
               {/* Listing Type */}
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Listing Type:</label>
+                <label className="block text-sm font-semibold text-workspace-text mb-2">Listing Type:</label>
                 <div className="space-y-2">
                   <label className="flex items-center cursor-pointer">
                     <input
@@ -3088,7 +3023,7 @@ export default function Home() {
                       name="listingType"
                       value="sale"
                       defaultChecked
-                      className="w-4 h-4 mr-2 accent-[#FF8C42]"
+                      className="w-4 h-4 mr-2 accent-workspace-accent"
                       onChange={(e) => {
                         const saleSection = document.getElementById('saleSection');
                         const leaseSection = document.getElementById('leaseSection');
@@ -3105,7 +3040,7 @@ export default function Home() {
                       type="radio"
                       name="listingType"
                       value="lease"
-                      className="w-4 h-4 mr-2 accent-[#FF8C42]"
+                      className="w-4 h-4 mr-2 accent-workspace-accent"
                       onChange={(e) => {
                         const saleSection = document.getElementById('saleSection');
                         const leaseSection = document.getElementById('leaseSection');
@@ -3122,7 +3057,7 @@ export default function Home() {
                       type="radio"
                       name="listingType"
                       value="both"
-                      className="w-4 h-4 mr-2 accent-[#FF8C42]"
+                      className="w-4 h-4 mr-2 accent-workspace-accent"
                       onChange={(e) => {
                         const saleSection = document.getElementById('saleSection');
                         const leaseSection = document.getElementById('leaseSection');
@@ -3139,21 +3074,21 @@ export default function Home() {
 
               {/* Sale Price */}
               <div id="saleSection" className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Sale Price (USD):</label>
+                <label className="block text-sm font-semibold text-workspace-text mb-2">Sale Price (USD):</label>
                 <input
                   type="number"
                   name="salePrice"
                   min="1"
                   step="0.01"
                   placeholder="500"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                  className="w-full px-4 py-3 border border-workspace-border rounded-lg focus:outline-none focus:ring-2 focus:ring-workspace-accent"
                   required
                 />
               </div>
 
               {/* Lease Pricing */}
               <div id="leaseSection" className="mb-6" style={{ display: 'none' }}>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Lease Pricing:</label>
+                <label className="block text-sm font-semibold text-workspace-text mb-2">Lease Pricing:</label>
                 <div className="space-y-3">
                   <input
                     type="number"
@@ -3161,7 +3096,7 @@ export default function Home() {
                     min="1"
                     step="0.01"
                     placeholder="1 Month Price ($50)"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                    className="w-full px-4 py-3 border border-workspace-border rounded-lg focus:outline-none focus:ring-2 focus:ring-workspace-accent"
                   />
                   <input
                     type="number"
@@ -3169,7 +3104,7 @@ export default function Home() {
                     min="1"
                     step="0.01"
                     placeholder="6 Months Price ($250)"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                    className="w-full px-4 py-3 border border-workspace-border rounded-lg focus:outline-none focus:ring-2 focus:ring-workspace-accent"
                   />
                   <input
                     type="number"
@@ -3177,21 +3112,21 @@ export default function Home() {
                     min="1"
                     step="0.01"
                     placeholder="1 Year Price ($400)"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF8C42]"
+                    className="w-full px-4 py-3 border border-workspace-border rounded-lg focus:outline-none focus:ring-2 focus:ring-workspace-accent"
                   />
                 </div>
               </div>
 
               {/* License Terms */}
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">License Terms:</label>
+                <label className="block text-sm font-semibold text-workspace-text mb-2">License Terms:</label>
                 <div className="space-y-2">
                   <label className="flex items-center cursor-pointer">
                     <input
                       type="checkbox"
                       name="commercialUse"
                       defaultChecked
-                      className="w-4 h-4 mr-2 accent-[#FF8C42]"
+                      className="w-4 h-4 mr-2 accent-workspace-accent"
                     />
                     <span>Commercial use allowed</span>
                   </label>
@@ -3200,7 +3135,7 @@ export default function Home() {
                       type="checkbox"
                       name="attribution"
                       defaultChecked
-                      className="w-4 h-4 mr-2 accent-[#FF8C42]"
+                      className="w-4 h-4 mr-2 accent-workspace-accent"
                     />
                     <span>Attribution required</span>
                   </label>
@@ -3210,7 +3145,7 @@ export default function Home() {
               {/* Submit Button */}
               <button
                 type="submit"
-                className="w-full bg-[#FF8C42] text-white py-4 rounded-lg font-bold text-lg hover:bg-[#ff7a2e] transition-all"
+                className="w-full workspace-action py-4 rounded-lg font-bold text-lg  transition-all"
               >
                 Publish to Marketplace
               </button>
@@ -3222,14 +3157,14 @@ export default function Home() {
       {/* Asset Detail Modal */}
       {showAssetDetail && selectedAsset && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[3000] p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-8 max-w-4xl w-full shadow-2xl relative my-8">
+          <div className="bg-workspace-panel rounded-2xl p-8 max-w-4xl w-full shadow-2xl relative my-8">
             {/* Close button */}
             <button
               onClick={() => {
                 setShowAssetDetail(false);
                 setSelectedAsset(null);
               }}
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl"
+              className="absolute top-4 right-4 text-workspace-muted hover:text-workspace-text text-2xl"
             >
               ×
             </button>
@@ -3237,15 +3172,15 @@ export default function Home() {
             <div className="grid md:grid-cols-2 gap-8">
               {/* Left: Preview */}
               <div>
-                <div className="bg-gradient-to-br from-orange-100 to-pink-100 rounded-xl h-64 flex items-center justify-center mb-4">
+                <div className="bg-gradient-to-br from-workspace-highlight to-workspace-hover rounded-xl h-64 flex items-center justify-center mb-4">
                   <div className="text-8xl">{getFileIcon(selectedAsset.fileType)}</div>
                 </div>
 
-                <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-lg text-center">
+                <div className="bg-emerald-950/60 border border-emerald-800 text-emerald-200 p-4 rounded-lg text-center">
                   <p className="font-semibold mb-1">✓ Verified on Polygon Blockchain</p>
                   <button
                     onClick={() => window.open(`https://polygonscan.com/tx/${selectedAsset.blockchainTx}`, '_blank')}
-                    className="text-sm underline hover:text-green-900"
+                    className="text-sm underline hover:text-emerald-100"
                   >
                     View Transaction
                   </button>
@@ -3254,10 +3189,10 @@ export default function Home() {
 
               {/* Right: Info & Purchase */}
               <div>
-                <h2 className="text-3xl font-bold text-gray-800 mb-2">{selectedAsset.fileName}</h2>
-                <p className="text-gray-600 mb-4">Protected creative asset</p>
+                <h2 className="text-3xl font-bold text-workspace-text mb-2">{selectedAsset.fileName}</h2>
+                <p className="text-workspace-muted mb-4">Protected creative asset</p>
 
-                <div className="bg-gray-50 p-4 rounded-lg mb-6 space-y-2 text-sm">
+                <div className="bg-workspace-field p-4 rounded-lg mb-6 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="font-semibold">Creator:</span>
                     <span>{selectedAsset.creator}</span>
@@ -3278,13 +3213,13 @@ export default function Home() {
 
                 {/* Purchase Options */}
                 {selectedAsset.salePrice > 0 && (
-                  <div className="bg-[#FFF5F0] border-2 border-[#FF8C42] p-6 rounded-xl mb-4">
-                    <h3 className="font-bold text-xl text-gray-800 mb-2">Buy Outright</h3>
-                    <div className="text-4xl font-bold text-[#FF8C42] mb-3">${selectedAsset.salePrice}</div>
-                    <p className="text-sm text-gray-600 mb-4">Full ownership transfer. You can use commercially and resell.</p>
+                  <div className="bg-workspace-highlight border-2 border-workspace-accent p-6 rounded-xl mb-4">
+                    <h3 className="font-bold text-xl text-workspace-text mb-2">Buy Outright</h3>
+                    <div className="text-4xl font-bold text-workspace-accent mb-3">${selectedAsset.salePrice}</div>
+                    <p className="text-sm text-workspace-muted mb-4">Full ownership transfer. You can use commercially and resell.</p>
                     <button
                       onClick={handlePurchaseAsset}
-                      className="w-full bg-[#FF8C42] text-white py-3 rounded-lg font-bold hover:bg-[#ff7a2e] transition-all"
+                      className="w-full workspace-action py-3 rounded-lg font-bold  transition-all"
                     >
                       Buy Now
                     </button>
@@ -3293,15 +3228,15 @@ export default function Home() {
 
                 {/* Lease Options */}
                 {selectedAsset.allowLease && (
-                  <div className="bg-purple-50 border-2 border-purple-300 p-6 rounded-xl">
-                    <h3 className="font-bold text-xl text-gray-800 mb-3">Lease</h3>
-                    <p className="text-sm text-gray-600 mb-4">Time-limited usage rights</p>
+                  <div className="bg-violet-950/60 border-2 border-violet-800 p-6 rounded-xl">
+                    <h3 className="font-bold text-xl text-workspace-text mb-3">Lease</h3>
+                    <p className="text-sm text-workspace-muted mb-4">Time-limited usage rights</p>
 
                     <div className="space-y-2">
                       {selectedAsset.leasePrice1Month > 0 && (
                         <button
                           onClick={() => handleLeaseAsset('1 Month', selectedAsset.leasePrice1Month)}
-                          className="w-full bg-white border-2 border-purple-300 text-purple-700 py-3 rounded-lg font-semibold hover:bg-purple-100 transition-all flex justify-between items-center px-4"
+                          className="w-full bg-workspace-panel border-2 border-violet-800 text-violet-200 py-3 rounded-lg font-semibold hover:bg-violet-900/60 transition-all flex justify-between items-center px-4"
                         >
                           <span>1 Month</span>
                           <span className="font-bold">${selectedAsset.leasePrice1Month}</span>
@@ -3310,7 +3245,7 @@ export default function Home() {
                       {selectedAsset.leasePrice6Month > 0 && (
                         <button
                           onClick={() => handleLeaseAsset('6 Months', selectedAsset.leasePrice6Month)}
-                          className="w-full bg-white border-2 border-purple-300 text-purple-700 py-3 rounded-lg font-semibold hover:bg-purple-100 transition-all flex justify-between items-center px-4"
+                          className="w-full bg-workspace-panel border-2 border-violet-800 text-violet-200 py-3 rounded-lg font-semibold hover:bg-violet-900/60 transition-all flex justify-between items-center px-4"
                         >
                           <span>6 Months</span>
                           <span className="font-bold">${selectedAsset.leasePrice6Month}</span>
@@ -3319,7 +3254,7 @@ export default function Home() {
                       {selectedAsset.leasePrice1Year > 0 && (
                         <button
                           onClick={() => handleLeaseAsset('1 Year', selectedAsset.leasePrice1Year)}
-                          className="w-full bg-white border-2 border-purple-300 text-purple-700 py-3 rounded-lg font-semibold hover:bg-purple-100 transition-all flex justify-between items-center px-4"
+                          className="w-full bg-workspace-panel border-2 border-violet-800 text-violet-200 py-3 rounded-lg font-semibold hover:bg-violet-900/60 transition-all flex justify-between items-center px-4"
                         >
                           <span>1 Year</span>
                           <span className="font-bold">${selectedAsset.leasePrice1Year}</span>
@@ -3330,9 +3265,9 @@ export default function Home() {
                 )}
 
                 {/* License Terms */}
-                <div className="mt-6 bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-gray-800 mb-2">License Terms</h4>
-                  <ul className="text-sm text-gray-600 space-y-1">
+                <div className="mt-6 bg-workspace-field p-4 rounded-lg">
+                  <h4 className="font-semibold text-workspace-text mb-2">License Terms</h4>
+                  <ul className="text-sm text-workspace-muted space-y-1">
                     <li>{selectedAsset.commercialUse ? '✓' : '✗'} Commercial use allowed</li>
                     <li>{selectedAsset.attribution ? '✓' : '✗'} Attribution required</li>
                     <li>✓ Blockchain verified ownership</li>

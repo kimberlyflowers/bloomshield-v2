@@ -1,65 +1,54 @@
 'use client';
 
-import { useState } from 'react';
+import WorkspaceIcon from './WorkspaceIcon';
 
 interface SidebarProps {
   isActive: boolean;
+  isCollapsed: boolean;
   onNavigate: (page: string) => void;
   currentPage: string;
 }
 
-export default function Sidebar({ isActive, onNavigate, currentPage }: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+const navigation = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'marketplace', label: 'Marketplace' },
+  { id: 'wallet', label: 'Wallet' },
+  { id: 'profile', label: 'Profile' },
+  { id: 'settings', label: 'Settings' },
+  { id: 'home', label: 'Home' },
+] as const;
 
-  const navItems = [
-    { id: 'home', icon: '⌂', label: 'Home' },
-    { id: 'dashboard', icon: '▦', label: 'Dashboard' },
-    { id: 'marketplace', icon: '◘', label: 'Marketplace' },
-    { id: 'wallet', icon: '⊞', label: 'Wallet' },
-    { id: 'profile', icon: '◉', label: 'Profile' },
-    { id: 'settings', icon: '⚙', label: 'Settings' },
-    { id: 'about', icon: 'ⓘ', label: 'About' },
-  ];
-
+export default function Sidebar({ isActive, isCollapsed, onNavigate, currentPage }: SidebarProps) {
   return (
-    <div
-      className={`fixed left-0 top-0 h-screen transition-all duration-500 ease-in-out z-[999] flex flex-col py-8 shadow-xl ${
-        isActive ? 'translate-x-0' : '-translate-x-full'
-      } ${isCollapsed ? 'w-[70px]' : 'w-[280px]'}`}
-      style={{
-        background: 'linear-gradient(180deg, #FFB5B5 0%, #FFAD99 30%, #FFA57A 60%, #FF9D5C 100%)',
-      }}
+    <aside
+      id="workspace-navigation"
+      className={`fixed bottom-0 left-0 top-16 z-40 w-56 overflow-y-auto border-r border-workspace-border bg-workspace-panel p-3 md:sticky md:top-16 md:z-auto md:block md:h-[calc(100dvh-4rem)] md:w-auto ${isActive ? 'block' : 'hidden'}`}
     >
-      <div className={`px-6 mb-8 flex items-center ${isCollapsed ? 'justify-center px-3' : 'justify-between'}`}>
-        {!isCollapsed && (
-          <h2 className="text-white text-3xl font-bold transition-opacity duration-300">
-            🌸 BloomShield
-          </h2>
-        )}
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="bg-white/20 hover:bg-white/30 text-white w-9 h-9 rounded-lg flex items-center justify-center text-xl transition-all flex-shrink-0"
-        >
-          {isCollapsed ? '▶' : '◀'}
-        </button>
+      <div className={`mb-5 flex items-center gap-3 rounded-xl border border-workspace-border bg-workspace-field p-3 ${isCollapsed ? 'md:hidden' : ''}`}>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-workspace-highlight text-workspace-accent">
+          <WorkspaceIcon name="shield" />
+        </span>
+        <div>
+          <p className="text-sm font-semibold">BloomShield</p>
+          <p className="text-xs text-workspace-muted">Creator workspace</p>
+        </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto">
-        {navItems.map((item) => (
+      <nav aria-label="Workspace" className="space-y-1">
+        {navigation.map(({ id, label }) => (
           <button
-            key={item.id}
-            onClick={() => onNavigate(item.id)}
-            className={`w-full flex items-center text-white font-medium transition-all border-l-4 ${
-              currentPage === item.id
-                ? 'bg-white/25 border-white'
-                : 'border-transparent hover:bg-white/15'
-            } ${isCollapsed ? 'px-0 py-4 justify-center' : 'px-6 py-4'}`}
+            key={id}
+            type="button"
+            onClick={() => onNavigate(id)}
+            aria-current={currentPage === id ? 'page' : undefined}
+            className={`workspace-nav-item ${isCollapsed ? 'md:justify-center md:px-0' : ''}`}
+            title={label}
           >
-            <span className={`text-2xl ${isCollapsed ? 'mr-0' : 'mr-4'}`}>{item.icon}</span>
-            {!isCollapsed && <span className="whitespace-nowrap">{item.label}</span>}
+            <WorkspaceIcon name={id} />
+            <span className={isCollapsed ? 'md:sr-only' : undefined}>{label}</span>
           </button>
         ))}
       </nav>
-    </div>
+    </aside>
   );
 }

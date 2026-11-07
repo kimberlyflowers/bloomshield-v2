@@ -126,3 +126,70 @@ body {
 .transition-margin {
   transition: margin-left 0.4s ease;
 }
+
+@layer components {
+  .workspace {
+    @apply bg-workspace-canvas text-workspace-text;
+    color-scheme: dark;
+  }
+
+  .workspace :is(button, a, input, select, textarea):focus-visible {
+    outline: 2px solid theme('colors.workspace.accent');
+    outline-offset: 2px;
+  }
+
+  .workspace-gradient {
+    @apply bg-gradient-to-r from-[#ffa569] to-[#ec7790] text-workspace-canvas;
+  }
+
+  .workspace-action {
+    @apply workspace-gradient font-semibold transition hover:brightness-110;
+  }
+
+  .workspace-nav-item {
+    @apply flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-semibold text-workspace-muted transition-colors hover:bg-workspace-hover hover:text-workspace-text;
+  }
+
+  .workspace-nav-item[aria-current] {
+    @apply bg-workspace-highlight text-workspace-accent;
+  }
+
+  .workspace-tabs {
+    @apply sticky top-16 z-20 overflow-x-auto border-b border-workspace-border bg-workspace-panel px-2 sm:px-5;
+  }
+
+  .workspace-tabs nav {
+    @apply mx-auto flex w-max min-w-full gap-1 sm:justify-center;
+  }
+
+  .workspace-tabs button {
+    @apply relative flex min-h-12 shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg px-3 text-sm font-semibold text-workspace-muted hover:bg-workspace-hover hover:text-workspace-text sm:px-4;
+  }
+
+  .workspace-tabs button[aria-current] {
+    @apply bg-workspace-field text-workspace-text;
+  }
+
+  .workspace-tabs button[aria-current]::after {
+    @apply absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-gradient-to-r from-[#ffa569] to-[#ec7790] content-[''];
+  }
+
+  .workspace input:not([type='checkbox'], [type='radio'], [type='file']),
+  .workspace select,
+  .workspace textarea {
+    @apply min-w-0 bg-workspace-field text-workspace-text placeholder:text-workspace-muted;
+  }
+
+  .workspace-card {
+    @apply rounded-xl border border-workspace-border bg-workspace-panel;
+  }
+
+  .workspace .file-card {
+    @apply overflow-hidden rounded-xl border border-workspace-border bg-workspace-panel shadow-none;
+  }
+
+  .workspace .file-card:hover {
+    transform: none;
+    @apply border-workspace-accent shadow-none;
+  }
+}
