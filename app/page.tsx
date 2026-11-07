@@ -11,6 +11,26 @@ import AuthModal from '@/components/AuthModal';
 import { onAuthStateChange, logout, generateUserWallet } from '@/lib/auth';
 import { UserProfile } from '@/types/user';
 
+function FileSummary({ icon, name, date, assetId }: {
+  icon: string;
+  name: string;
+  date: string;
+  assetId: string;
+}) {
+  return (
+    <>
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-workspace-field text-xl" aria-hidden="true">
+        {icon}
+      </span>
+      <span className="grid min-w-0 gap-0.5">
+        <span className="truncate text-sm font-semibold text-workspace-text" title={name}>{name}</span>
+        <span className="text-sm text-workspace-muted">Protected {date}</span>
+        <span className="truncate font-mono text-xs text-workspace-muted" title={assetId}>{assetId}</span>
+      </span>
+    </>
+  );
+}
+
 export default function Home() {
   // Auth state
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -1251,42 +1271,42 @@ export default function Home() {
             </div>
 
             {/* Dashboard Main Content */}
-            <div className="mx-auto max-w-7xl p-4 sm:p-8">
+            <div className="mx-auto max-w-7xl p-4 sm:p-6">
               {/* OVERVIEW SECTION */}
               {dashboardSection === 'overview' && (
                 <div>
-                  <div className="mb-6">
+                  <div className="mb-4">
                     <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-workspace-accent">Creator workspace</p>
-                    <h1 className="text-3xl font-bold tracking-tight">Dashboard overview</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">Dashboard overview</h1>
                     <p className="mt-2 text-sm text-workspace-muted">Manage and protect your creative work.</p>
                   </div>
 
                   {/* Stats Grid */}
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4 mb-8">
-                    <div className="workspace-card p-4 sm:p-5">
-                      <div className="text-workspace-muted text-sm mb-2">Total Files Protected</div>
-                      <div className="text-4xl font-bold text-workspace-text">{protectedFiles.length}</div>
+                  <div className="mb-5 grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
+                    <div className="workspace-card p-3">
+                      <div className="mb-1 text-sm text-workspace-muted">Total Files Protected</div>
+                      <div className="text-2xl font-bold text-workspace-text">{protectedFiles.length}</div>
                     </div>
-                    <div className="workspace-card p-4 sm:p-5">
-                      <div className="text-workspace-muted text-sm mb-2">Active Monitoring</div>
-                      <div className="text-4xl font-bold text-workspace-text">0</div>
+                    <div className="workspace-card p-3">
+                      <div className="mb-1 text-sm text-workspace-muted">Active Monitoring</div>
+                      <div className="text-2xl font-bold text-workspace-text">0</div>
                     </div>
-                    <div className="workspace-card p-4 sm:p-5">
-                      <div className="text-workspace-muted text-sm mb-2">Open Cases</div>
-                      <div className="text-4xl font-bold text-workspace-text">0</div>
+                    <div className="workspace-card p-3">
+                      <div className="mb-1 text-sm text-workspace-muted">Open Cases</div>
+                      <div className="text-2xl font-bold text-workspace-text">0</div>
                     </div>
-                    <div className="workspace-card p-4 sm:p-5">
-                      <div className="text-workspace-muted text-sm mb-2">License Requests</div>
-                      <div className="text-4xl font-bold text-workspace-text">3</div>
+                    <div className="workspace-card p-3">
+                      <div className="mb-1 text-sm text-workspace-muted">License Requests</div>
+                      <div className="text-2xl font-bold text-workspace-text">3</div>
                     </div>
                   </div>
 
                   <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(16rem,21rem)]">
                     <section className="min-w-0">
                       {/* Recent Files */}
-                      <h2 className="text-2xl font-bold text-workspace-text mb-6">Recent Files</h2>
+                      <h2 className="mb-3 text-lg font-bold text-workspace-text">Recent Files</h2>
                       {protectedFiles.length === 0 ? (
-                        <div className="workspace-card px-6 py-12 text-center text-workspace-muted">
+                        <div className="workspace-card px-4 py-6 text-center text-workspace-muted">
                           <div className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-xl bg-workspace-field text-workspace-accent">
                             <WorkspaceIcon name="file" />
                           </div>
@@ -1294,42 +1314,34 @@ export default function Home() {
                           <p className="mt-1 text-sm">Protect a file to see it here.</p>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="grid gap-2">
                           {protectedFiles.slice(0, 4).map((file, index) => (
                             <button
                               key={index}
                               type="button"
-                              className="file-card min-w-0 cursor-pointer text-left"
+                              className="file-card flex min-w-0 items-center gap-3 p-3 text-left"
                               onClick={() => {
                                 setCertificateData(file);
                                 setShowCertificate(true);
                               }}
                             >
-                              <div className="w-full h-48 flex items-center justify-center text-6xl bg-workspace-field">
-                                {getFileIcon(file.fileType)}
-                              </div>
-                              <div className="p-5">
-                                <div className="font-semibold text-workspace-text mb-2 truncate" title={file.fileName}>
-                                  {file.fileName}
-                                </div>
-                                <div className="text-workspace-muted text-sm mb-3">
-                                  Protected {getRelativeDate(file.protectedDate)}
-                                </div>
-                                <div className="font-mono bg-workspace-field p-3 rounded-lg text-xs text-workspace-muted truncate" title={file.assetId}>
-                                  {file.assetId}
-                                </div>
-                              </div>
+                              <FileSummary
+                                icon={getFileIcon(file.fileType)}
+                                name={file.fileName}
+                                date={getRelativeDate(file.protectedDate)}
+                                assetId={file.assetId}
+                              />
                             </button>
                           ))}
                         </div>
                       )}
                     </section>
-                    <aside className="workspace-card order-first self-start p-5 sm:p-6 xl:order-none">
-                      <div className="mb-4 grid h-10 w-10 place-items-center rounded-xl bg-workspace-highlight text-workspace-accent">
-                        <WorkspaceIcon name="shield" />
-                      </div>
-                      <h2 className="text-lg font-bold">Protect new work</h2>
-                      <p className="mb-5 mt-2 break-words text-sm leading-relaxed text-workspace-muted">
+                    <aside className="workspace-card order-first self-start p-4 xl:order-none">
+                      <h2 className="flex items-center gap-2 text-base font-bold">
+                        <span className="text-workspace-accent"><WorkspaceIcon name="shield" /></span>
+                        Protect new work
+                      </h2>
+                      <p className="mb-3 mt-2 break-words text-sm leading-relaxed text-workspace-muted">
                         {selectedFile
                           ? `Selected: ${selectedFile.name} (${(selectedFile.size / 1024 / 1024).toFixed(2)} MB)`
                           : 'Upload a file to generate its blockchain certificate.'}
@@ -1343,7 +1355,7 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="workspace-action w-full rounded-lg px-4 py-2.5 text-sm"
+                        className="workspace-action min-h-11 w-full rounded-lg px-4 py-2 text-sm"
                       >
                         Choose file
                       </button>
@@ -1355,7 +1367,7 @@ export default function Home() {
               {/* MY FILES SECTION */}
               {dashboardSection === 'files' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-4">My Files</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-4">My Files</h1>
                   <p className="text-workspace-muted mb-8">All your protected files in one place</p>
 
                   {protectedFiles.length === 0 ? (
@@ -1368,31 +1380,24 @@ export default function Home() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {protectedFiles.map((file, index) => (
                         <div key={index} className="file-card">
-                          <div
-                            className="cursor-pointer"
+                          <button
+                            type="button"
+                            className="flex w-full min-w-0 items-center gap-3 p-3 text-left"
                             onClick={() => {
                               setCertificateData(file);
                               setShowCertificate(true);
                             }}
                           >
-                            <div className="w-full h-48 flex items-center justify-center text-6xl bg-workspace-field">
-                              {getFileIcon(file.fileType)}
-                            </div>
-                            <div className="p-5">
-                              <div className="font-semibold text-workspace-text mb-2 truncate" title={file.fileName}>
-                                {file.fileName}
-                              </div>
-                              <div className="text-workspace-muted text-sm mb-3">
-                                Protected {getRelativeDate(file.protectedDate)}
-                              </div>
-                              <div className="font-mono bg-workspace-field p-3 rounded-lg text-xs text-workspace-muted truncate" title={file.assetId}>
-                                {file.assetId}
-                              </div>
-                            </div>
-                          </div>
+                            <FileSummary
+                              icon={getFileIcon(file.fileType)}
+                              name={file.fileName}
+                              date={getRelativeDate(file.protectedDate)}
+                              assetId={file.assetId}
+                            />
+                          </button>
 
                           {/* Action Buttons */}
-                          <div className="px-5 pb-5 space-y-2">
+                          <div className="px-3 pb-3 space-y-2">
                             {file.isListed ? (
                               <div className="space-y-2">
                                 <div className="bg-emerald-950/60 border border-emerald-800 text-emerald-200 text-center py-2 rounded-lg text-sm font-semibold">
@@ -1403,7 +1408,7 @@ export default function Home() {
                                     e.stopPropagation();
                                     handleUnlistAsset(file.assetId);
                                   }}
-                                  className="w-full bg-workspace-hover text-workspace-text py-2 rounded-lg text-sm font-semibold hover:bg-workspace-hover transition-all"
+                                  className="min-h-11 w-full bg-workspace-hover text-workspace-text py-2 rounded-lg text-sm font-semibold hover:bg-workspace-hover transition-all"
                                 >
                                   Remove from Marketplace
                                 </button>
@@ -1414,7 +1419,7 @@ export default function Home() {
                                   e.stopPropagation();
                                   handleListAsset(file);
                                 }}
-                                className="w-full workspace-action py-2 rounded-lg text-sm font-semibold  transition-all"
+                                className="min-h-11 w-full workspace-action py-2 rounded-lg text-sm font-semibold  transition-all"
                               >
                                 🛒 List on Marketplace
                               </button>
@@ -1430,7 +1435,7 @@ export default function Home() {
               {/* MONITORING SECTION */}
               {dashboardSection === 'monitoring' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Monitoring</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-8">Monitoring</h1>
 
                   <div className="bg-workspace-highlight rounded-2xl p-12 text-center text-white shadow-lg">
                     <h3 className="text-3xl font-bold mb-4">🔍 Unlock Advanced Monitoring</h3>
@@ -1448,7 +1453,7 @@ export default function Home() {
               {/* CASES SECTION */}
               {dashboardSection === 'cases' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Cases</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-8">Cases</h1>
 
                   <div className="bg-workspace-highlight rounded-2xl p-12 text-center text-white shadow-lg">
                     <h3 className="text-3xl font-bold mb-4">⚖️ Unlock Case Management</h3>
@@ -1466,10 +1471,10 @@ export default function Home() {
               {/* LICENSE REQUESTS SECTION */}
               {dashboardSection === 'licenses' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-4">License Requests</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-4">License Requests</h1>
                   <p className="text-workspace-muted mb-8">Manage incoming licensing requests for your work</p>
 
-                  <div className="workspace-card p-16 text-center">
+                  <div className="workspace-card px-4 py-8 text-center">
                     <div className="text-6xl mb-4">💼</div>
                     <p className="text-workspace-muted text-lg">No license requests yet</p>
                     <p className="text-workspace-muted text-sm mt-2">When someone requests to license your work, it will appear here</p>
@@ -1519,11 +1524,11 @@ export default function Home() {
             </div>
 
             {/* Wallet Main Content */}
-            <div className="mx-auto max-w-7xl p-4 sm:p-8">
+            <div className="mx-auto max-w-7xl p-4 sm:p-6">
               {/* OVERVIEW SECTION */}
               {walletSection === 'overview' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Overview</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-8">Overview</h1>
 
                   {/* Balance Display */}
                   <div className="workspace-card p-8 mb-8">
@@ -1550,7 +1555,7 @@ export default function Home() {
 
                   {/* Recent Transactions */}
                   <h2 className="text-2xl font-bold text-workspace-text mb-4">Recent Transactions</h2>
-                  <div className="workspace-card p-16 text-center">
+                  <div className="workspace-card px-4 py-8 text-center">
                     <div className="text-6xl mb-4">📊</div>
                     <p className="text-workspace-muted">No transactions yet</p>
                   </div>
@@ -1560,7 +1565,7 @@ export default function Home() {
               {/* CARDS SECTION */}
               {walletSection === 'cards' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-8">BloomCard</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-8">BloomCard</h1>
 
                   {/* 3D Credit Card */}
                   <div
@@ -1640,9 +1645,9 @@ export default function Home() {
               {/* TRANSACTIONS SECTION */}
               {walletSection === 'transactions' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Transactions</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-8">Transactions</h1>
 
-                  <div className="workspace-card p-16 text-center">
+                  <div className="workspace-card px-4 py-8 text-center">
                     <div className="text-6xl mb-4">📋</div>
                     <p className="text-workspace-muted text-lg">No transactions yet</p>
                     <p className="text-workspace-muted text-sm mt-2">All licensing payments and withdrawals will appear here</p>
@@ -1653,9 +1658,9 @@ export default function Home() {
               {/* DIRECT DEPOSIT SECTION */}
               {walletSection === 'deposit' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Direct Deposit</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-8">Direct Deposit</h1>
 
-                  <div className="workspace-card p-16 text-center">
+                  <div className="workspace-card px-4 py-8 text-center">
                     <div className="text-6xl mb-4">🏦</div>
                     <p className="text-workspace-muted text-lg mb-6">No bank account connected</p>
                     <button
@@ -1671,7 +1676,7 @@ export default function Home() {
               {/* SETTINGS SECTION */}
               {walletSection === 'settings' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Wallet Settings</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-8">Wallet Settings</h1>
 
                   <div className="workspace-card divide-y">
                     <div className="p-6">
@@ -1697,7 +1702,7 @@ export default function Home() {
         {currentPage === 'marketplace' && (
           <div className="p-4 md:p-8 max-w-7xl mx-auto">
             <div className="mb-8">
-              <h1 className="text-3xl md:text-4xl font-bold text-workspace-text mb-2">Marketplace</h1>
+              <h1 className="text-2xl font-bold text-workspace-text mb-2">Marketplace</h1>
               <p className="text-workspace-muted">License your protected content and earn revenue</p>
             </div>
 
@@ -1766,7 +1771,7 @@ export default function Home() {
           <div className="p-4 md:p-8 max-w-7xl mx-auto">
             {/* Marketplace Header */}
             <div className="mb-8">
-              <h1 className="text-4xl font-bold text-workspace-text mb-4">Marketplace</h1>
+              <h1 className="text-2xl font-bold text-workspace-text mb-4">Marketplace</h1>
               <p className="text-workspace-muted">Buy or lease creative assets protected on blockchain</p>
             </div>
 
@@ -1862,7 +1867,7 @@ export default function Home() {
             {/* Asset Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {marketplaceAssets.length === 0 ? (
-                <div className="col-span-full workspace-card p-16 text-center">
+                <div className="col-span-full workspace-card px-4 py-8 text-center">
                   <div className="text-6xl mb-4">🛒</div>
                   <p className="text-workspace-muted text-lg mb-2">No assets listed yet</p>
                   <p className="text-workspace-muted text-sm">Check back later for new listings!</p>
@@ -2289,11 +2294,11 @@ export default function Home() {
             </div>
 
             {/* Settings Main Content */}
-            <div className="mx-auto max-w-7xl p-4 sm:p-8">
+            <div className="mx-auto max-w-7xl p-4 sm:p-6">
               {/* ACCOUNT SECTION */}
               {settingsSection === 'account' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Account Settings</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-8">Account Settings</h1>
                   <div className="workspace-card p-6 mb-6">
                     <h3 className="text-xl font-semibold text-workspace-text mb-4">Profile Information</h3>
                     <p className="text-workspace-muted">Manage your account details and preferences.</p>
@@ -2310,7 +2315,7 @@ export default function Home() {
               {/* OWNERSHIP WALLET SECTION */}
               {settingsSection === 'wallet' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-4">Ownership Wallet</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-4">Ownership Wallet</h1>
                   <p className="text-workspace-muted mb-8">Your permanent proof of ownership on the blockchain</p>
 
                   {/* Wallet Address Card */}
@@ -2400,7 +2405,7 @@ export default function Home() {
               {/* SECURITY SECTION */}
               {settingsSection === 'security' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-4">Security</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-4">Security</h1>
                   <p className="text-workspace-muted mb-8">Manage your account security and authentication</p>
 
                   {/* Password Card */}
@@ -2538,7 +2543,7 @@ export default function Home() {
               {/* PRIVACY SECTION */}
               {settingsSection === 'privacy' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-4">Privacy</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-4">Privacy</h1>
                   <p className="text-workspace-muted mb-8">Control who can see your profile and content</p>
 
                   {/* Profile Visibility Card */}
@@ -2596,7 +2601,7 @@ export default function Home() {
               {/* NOTIFICATIONS SECTION */}
               {settingsSection === 'notifications' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-4">Notifications</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-4">Notifications</h1>
                   <p className="text-workspace-muted mb-8">Manage your notification preferences</p>
 
                   {/* Email Notifications Card */}
@@ -2638,7 +2643,7 @@ export default function Home() {
               {/* BILLING SECTION */}
               {settingsSection === 'billing' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-8">Billing & Subscription</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-8">Billing & Subscription</h1>
                   <div className="workspace-card p-6 mb-6">
                     <h3 className="text-xl font-semibold text-workspace-text mb-4">Current Plan</h3>
                     <p className="text-workspace-muted mb-4">Manage your subscription and billing information</p>
@@ -2655,7 +2660,7 @@ export default function Home() {
               {/* DATA & EXPORT SECTION */}
               {settingsSection === 'data' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-4">Data & Export</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-4">Data & Export</h1>
                   <p className="text-workspace-muted mb-8">Download your data and manage account information</p>
 
                   {/* Data Export Card */}
@@ -2699,7 +2704,7 @@ export default function Home() {
               {/* ADVANCED SECTION */}
               {settingsSection === 'advanced' && (
                 <div>
-                  <h1 className="text-4xl font-bold text-workspace-text mb-4">Advanced Settings</h1>
+                  <h1 className="text-2xl font-bold text-workspace-text mb-4">Advanced Settings</h1>
                   <p className="text-workspace-muted mb-8">API access and account management</p>
 
                   {/* API Keys Card */}

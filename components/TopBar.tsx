@@ -26,7 +26,7 @@ export default function TopBar({
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="grid h-9 w-9 place-items-center rounded-lg border border-workspace-border text-workspace-muted md:hidden"
+            className="grid h-11 w-11 place-items-center rounded-lg border border-workspace-border text-workspace-muted md:hidden"
             aria-label="Toggle workspace navigation"
             aria-controls="workspace-navigation"
             aria-expanded={sidebarOpen}
@@ -54,7 +54,7 @@ export default function TopBar({
           type="button"
           onClick={onProfile}
           aria-label="Open profile"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-workspace-border bg-workspace-highlight text-sm font-bold text-workspace-accent"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full md:h-9 md:w-9 border border-workspace-border bg-workspace-highlight text-sm font-bold text-workspace-accent"
         >
           {initial}
         </button>
