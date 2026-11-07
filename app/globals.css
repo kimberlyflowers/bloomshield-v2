@@ -126,3 +126,51 @@ body {
 .transition-margin {
   transition: margin-left 0.4s ease;
 }
+
+/* Bloomie styling shared by the public entry and account screens. */
+@layer components {
+  .bloom-canvas {
+    @apply bg-bloom-canvas text-bloom-text;
+    color-scheme: dark;
+    background-image: radial-gradient(ellipse at 50% 0%, #241e23 0%, transparent 65%);
+  }
+
+  .bloom-panel {
+    @apply rounded-2xl border border-bloom-border bg-bloom-panel text-bloom-text shadow-2xl;
+    color-scheme: dark;
+  }
+
+  .bloom-mark {
+    @apply inline-grid shrink-0 place-items-center text-xl font-bold text-bloom-canvas;
+  }
+
+  .bloom-mark,
+  .bloom-primary {
+    background: linear-gradient(135deg, #ec7894, #f7a26f);
+  }
+
+  .bloom-primary {
+    @apply text-bloom-canvas transition-colors;
+  }
+
+  .bloom-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #fa91a9, #ffb98e);
+  }
+
+  .bloom-primary:disabled {
+    @apply cursor-not-allowed bg-none bg-bloom-field text-bloom-muted;
+  }
+
+  .bloom-secondary {
+    @apply border border-bloom-border bg-bloom-field text-bloom-text transition-colors hover:border-bloom-accent;
+  }
+
+  .bloom-input {
+    @apply w-full rounded-lg border border-bloom-border bg-bloom-field px-4 py-2.5 text-sm text-bloom-text placeholder:text-bloom-muted;
+  }
+
+  :is(.bloom-panel, .bloom-canvas, header:has(.bloom-mark)) :is(button, a, input):focus-visible {
+    outline: 2px solid #fa9aab;
+    outline-offset: 3px;
+  }
+}

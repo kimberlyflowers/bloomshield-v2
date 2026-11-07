@@ -1099,103 +1099,66 @@ export default function Home() {
 
         {/* HOME PAGE */}
         {currentPage === 'home' && (
-          <div className="relative min-h-[calc(100vh-70px)] overflow-hidden flex flex-col">
-            {/* Hero Image Background */}
-            <div className="absolute inset-0">
-              <img
-                src="/images/bloomshield-hero.png"
-                alt=""
-                className="w-full h-full object-cover object-right"
-              />
-              {/* Left gradient overlay for text readability */}
-              <div className="absolute inset-0" style={{
-                background: 'linear-gradient(to right, rgba(20,15,30,0.75) 0%, rgba(20,15,30,0.5) 30%, rgba(20,15,30,0.15) 55%, transparent 70%)'
-              }} />
-              {/* Bottom gradient for CTA bar */}
-              <div className="absolute inset-0" style={{
-                background: 'linear-gradient(to top, rgba(20,15,30,0.6) 0%, rgba(20,15,30,0.2) 20%, transparent 40%)'
-              }} />
-            </div>
+          <main className="bloom-canvas flex min-h-[calc(100svh-65px)] items-center px-4 py-8 sm:px-8 sm:py-12">
+            <div className="bloom-panel mx-auto grid w-full max-w-6xl overflow-hidden lg:grid-cols-[1.1fr_1fr]">
+              <div className="min-w-0 px-6 py-9 sm:p-12 lg:p-14">
+                <div className="mb-6 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-bloom-accent">
+                  <span className="h-1.5 w-1.5 rounded-full bg-bloom-accent" aria-hidden="true" />
+                  Creative protection
+                </div>
+                <h1 className="mb-4 text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl">
+                  Protect Your Creative Work <span className="text-bloom-accent">in 60 Seconds</span>
+                </h1>
+                <p className="max-w-sm text-base leading-relaxed text-bloom-muted">
+                  Blockchain verification trusted by 1,000+ creators.
+                </p>
 
-            {/* Main Content Area */}
-            <div className="relative z-10 flex-1 flex items-center">
-              <div className="w-full max-w-7xl mx-auto px-6 md:px-12 lg:px-16">
-                <div className="max-w-xl">
-                  <h1 className="text-4xl md:text-5xl lg:text-[3.5rem] font-bold text-white leading-[1.15] mb-6" style={{ textShadow: '0 2px 30px rgba(0,0,0,0.4)' }}>
-                    Protect Your Creative Work in 60 Seconds
-                  </h1>
-                  <p className="text-base md:text-lg text-white/75 leading-relaxed max-w-md" style={{ textShadow: '0 1px 12px rgba(0,0,0,0.3)' }}>
-                    Blockchain verification trusted by 1,000+ creators.
+                <div className="mt-8 border-t border-bloom-border pt-6">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isLoggedIn) {
+                        setShowLoginModal(true);
+                      } else {
+                        fileInputRef.current?.click();
+                      }
+                    }}
+                    className="bloom-primary inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold sm:w-auto"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m9 12 2 2 4-4" />
+                    </svg>
+                    Protect Your Work
+                  </button>
+                  <p className="mt-3 break-words text-sm text-bloom-muted">
+                    {selectedFile
+                      ? `Selected: ${selectedFile.name} (${(selectedFile.size / 1024 / 1024).toFixed(2)} MB)`
+                      : 'Choose a file to get started. Your first 5 files are free.'}
                   </p>
                 </div>
-              </div>
-            </div>
 
-            {/* Bottom CTA Bar */}
-            <div className="relative z-10 pb-8 px-4 md:px-12 lg:px-16">
-              <div className="max-w-2xl mx-auto">
-                {/* Upload CTA */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileSelect}
-                  className="hidden"
+                <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs text-bloom-muted">
+                  <li><span className="mr-1 text-emerald-400" aria-hidden="true">✓</span> No credit card required</li>
+                  <li><span className="mr-1 text-emerald-400" aria-hidden="true">✓</span> Blockchain Verified</li>
+                </ul>
+              </div>
+              <div className="relative min-h-48 overflow-hidden border-t border-bloom-border sm:min-h-64 lg:border-l lg:border-t-0">
+                <img
+                  src="/images/bloomshield-hero.png"
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover object-right"
+                  fetchPriority="high"
                 />
-                <button
-                  onClick={() => {
-                    if (!isLoggedIn) {
-                      setShowLoginModal(true);
-                    } else {
-                      fileInputRef.current?.click();
-                    }
-                  }}
-                  className="w-full group"
-                >
-                  <div className="bg-[#1a1a2e]/80 backdrop-blur-lg rounded-2xl px-6 py-5 md:px-8 md:py-6 flex items-center gap-4 md:gap-5 border-2 border-dashed border-white/25 hover:border-white/40 transition-all hover:bg-[#1a1a2e]/90 shadow-2xl cursor-pointer">
-                    {/* Shield Icon */}
-                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-white/10 flex items-center justify-center shrink-0 border border-white/5">
-                      <svg viewBox="0 0 24 24" className="w-6 h-6 md:w-7 md:h-7 text-white" fill="currentColor">
-                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 2.18l7 3.12v4.7c0 4.83-3.13 9.37-7 10.5-3.87-1.13-7-5.67-7-10.5V6.3l7-3.12z" />
-                        <path d="M12 7l-4 2v3c0 2.5 1.7 4.8 4 5.5 2.3-.7 4-3 4-5.5V9l-4-2z" opacity="0.5" />
-                      </svg>
-                    </div>
-                    {/* Text */}
-                    <div className="text-left flex-1 min-w-0">
-                      <div className="text-white font-bold text-base md:text-lg">Protect Your Work</div>
-                      <div className="text-white/45 text-sm truncate">
-                        {selectedFile
-                          ? `Selected: ${selectedFile.name} (${(selectedFile.size / 1024 / 1024).toFixed(2)} MB)`
-                          : 'Click to choose files or drag & drop. Your first 5 files are free.'
-                        }
-                      </div>
-                    </div>
-                    {/* Arrow */}
-                    <div className="text-white/25 group-hover:text-white/60 transition-colors shrink-0">
-                      <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M9 18l6-6-6-6" />
-                      </svg>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Trust badges */}
-                <div className="flex items-center justify-center gap-6 mt-4 text-white/45 text-xs md:text-sm">
-                  <span className="flex items-center gap-1.5">
-                    <svg viewBox="0 0 20 20" className="w-4 h-4 text-green-400/60" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    No credit card required
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <svg viewBox="0 0 20 20" className="w-4 h-4 text-green-400/60" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    Blockchain Verified
-                  </span>
-                </div>
               </div>
             </div>
-          </div>
+          </main>
         )}
 
         {/* DASHBOARD PAGE */}

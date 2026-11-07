@@ -9,40 +9,32 @@ interface TopBarProps {
 
 export default function TopBar({ onLogin, isLoggedIn, onToggleSidebar, onLogoClick }: TopBarProps) {
   return (
-    <div className="bg-white px-4 md:px-8 py-4 shadow-md flex justify-between items-center sticky top-0 z-50">
-      <div className="flex items-center gap-2 md:gap-4">
-        {/* Only show hamburger menu when logged in */}
-        {isLoggedIn && onToggleSidebar && (
-          <button
-            onClick={onToggleSidebar}
-            className="text-2xl text-[#FF8C42] hover:bg-orange-50 w-10 h-10 rounded-lg flex items-center justify-center transition-all hover:scale-110"
-            aria-label="Toggle menu"
-            title="Open menu"
-          >
-            ☰
+    <header className="sticky top-0 z-50 border-b border-bloom-border bg-bloom-panel text-bloom-text">
+      <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-8">
+        <div className="flex items-center gap-3">
+          {isLoggedIn && onToggleSidebar && (
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="bloom-secondary grid h-10 w-10 place-items-center rounded-lg text-lg"
+              aria-label="Toggle menu"
+            >
+              ☰
+            </button>
+          )}
+          <button type="button" onClick={onLogoClick} className="flex items-center gap-2.5 rounded-lg font-bold">
+            <span className="bloom-mark h-9 w-9 rounded-[10px]" aria-hidden="true">B</span>
+            BloomShield
+          </button>
+        </div>
+        {isLoggedIn ? (
+          <span className="text-sm text-bloom-muted">Welcome!</span>
+        ) : (
+          <button type="button" onClick={onLogin} className="bloom-secondary rounded-lg px-4 py-2 text-sm font-semibold">
+            Log in
           </button>
         )}
-        <div
-          className="text-xl md:text-2xl font-semibold text-[#FF8C42] cursor-pointer hover:opacity-80 transition-opacity"
-          onClick={onLogoClick}
-          title="Go to homepage"
-        >
-          🌸 BloomShield
-        </div>
       </div>
-      {!isLoggedIn && (
-        <button
-          onClick={onLogin}
-          className="bg-white text-[#FF8C42] border-2 border-[#FF8C42] px-4 md:px-6 py-2 rounded-lg font-semibold hover:bg-[#FF8C42] hover:text-white transition-all"
-        >
-          Log in
-        </button>
-      )}
-      {isLoggedIn && (
-        <div className="text-sm text-gray-600">
-          Welcome! 👋
-        </div>
-      )}
-    </div>
+    </header>
   );
 }
