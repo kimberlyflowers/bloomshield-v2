@@ -10,17 +10,39 @@ const CONTRACT_ABI = [
   'event TimestampCreated(string indexed legalHash, string contentHash, string floralHash, string ipfsHash, string fileName, uint256 timestamp, address creator)',
 ];
 
-// Polygon mainnet RPCs (fallback list for reliability)
 const POLYGON_RPCS = [
-  'https://polygon-bor-rpc.publicnode.com',
-  'https://polygon-rpc.com',
   'https://polygon.drpc.org',
+  'https://polygon.publicnode.com',
+  'https://tenderly.rpc.polygon.community',
+  'https://1rpc.io/matic',
 ];
 
+class PolygonProvider extends ethers.providers.StaticJsonRpcProvider {
+  constructor(private readonly endpoint: string) {
+    super(endpoint, { name: 'matic', chainId: 137 });
+  }
+
+  async send(method: string, params: Array<unknown>) {
+    const response = await fetch(this.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(6500),
+    });
+    if (!response.ok) throw new Error(`Polygon RPC returned HTTP ${response.status}`);
+    const body = await response.json();
+    if (body.error) {
+      throw Object.assign(new Error(body.error.message), { code: body.error.code, data: body.error.data });
+    }
+    return body.result;
+  }
+}
+
 async function getPolygonProvider() {
-  const providers = [process.env.POLYGON_RPC_URL, ...POLYGON_RPCS].filter((url): url is string => !!url);
-  return Promise.any(providers.map(async url => {
-    const provider = new ethers.providers.StaticJsonRpcProvider({ url, timeout: 4500 }, { name: 'matic', chainId: 137 });
+  const endpoints = [process.env.POLYGON_RPC_URL, ...POLYGON_RPCS].filter((url): url is string => !!url);
+  return Promise.any(endpoints.map(async url => {
+    const provider = new PolygonProvider(url);
     if (Number(await provider.send('eth_chainId', [])) !== 137) {
       throw new Error('RPC is not on Polygon mainnet');
     }
@@ -222,7 +244,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         error: 'Failed to verify timestamp',
-        details: error.message,
+
       },
       { status: 500 }
     );
