@@ -110,6 +110,7 @@ export async function signUp({ email, password, name }: SignUpData): Promise<{ s
       options: {
         data: {
           name,
+          terms_version: '2026-11-07',
           wallet_address: wallet.address,
           wallet_seed_phrase: wallet.seedPhrase,
           account_type: 'free',

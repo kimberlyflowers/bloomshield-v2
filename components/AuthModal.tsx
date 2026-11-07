@@ -192,6 +192,10 @@ export default function AuthModal({ show, onClose, onLoginSuccess, onSignUpSucce
   };
 
   const handleOAuthLogin = async (provider: 'google' | 'github') => {
+    if (!agreeToTerms) {
+      setError('Review and accept the Terms of Service before continuing.');
+      return;
+    }
     setError(null);
     setLoading(true);
 
@@ -244,6 +248,12 @@ export default function AuthModal({ show, onClose, onLoginSuccess, onSignUpSucce
           <div>
             <h2 className="text-3xl font-bold text-gray-800 mb-2 text-center">Create Account</h2>
             <p className="text-gray-600 mb-8 text-center">Join BloomShield to protect your creative work</p>
+
+            <label className="mb-4 flex items-start gap-2 text-sm text-gray-700">
+              <input type="checkbox" className="mt-0.5" checked={agreeToTerms}
+                onChange={event => setAgreeToTerms(event.target.checked)} />
+              <span>I accept the <a href="/terms" target="_blank" rel="noreferrer" className="text-[#FF8C42] underline">Terms of Service</a></span>
+            </label>
 
             {/* OAuth Buttons - Primary */}
             <div className="flex flex-col gap-3 mb-6">
@@ -332,23 +342,6 @@ export default function AuthModal({ show, onClose, onLoginSuccess, onSignUpSucce
                 />
               </div>
 
-              <div className="mb-6">
-                <label className="flex items-start cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={agreeToTerms}
-                    onChange={(e) => setAgreeToTerms(e.target.checked)}
-                    className="w-4 h-4 mr-2 mt-0.5 cursor-pointer accent-[#FF8C42]"
-                    disabled={loading}
-                  />
-                  <span className="text-sm text-gray-700">
-                    I agree to the{' '}
-                    <a href="/terms" target="_blank" className="text-[#FF8C42] hover:underline">
-                      Terms of Service
-                    </a>
-                  </span>
-                </label>
-              </div>
 
               <button
                 type="submit"
@@ -381,6 +374,12 @@ export default function AuthModal({ show, onClose, onLoginSuccess, onSignUpSucce
           <div>
             <h2 className="text-3xl font-bold text-gray-800 mb-2 text-center">Welcome to BloomShield</h2>
             <p className="text-gray-600 mb-8 text-center">Sign in to protect your creative work</p>
+
+            <label className="mb-4 flex items-start gap-2 text-sm text-gray-700">
+              <input type="checkbox" className="mt-0.5" checked={agreeToTerms}
+                onChange={event => setAgreeToTerms(event.target.checked)} />
+              <span>I accept the <a href="/terms" target="_blank" rel="noreferrer" className="text-[#FF8C42] underline">Terms of Service</a></span>
+            </label>
 
             {/* OAuth Buttons - Primary */}
             <div className="flex flex-col gap-3 mb-6">
