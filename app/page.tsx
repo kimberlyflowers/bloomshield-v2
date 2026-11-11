@@ -11,7 +11,7 @@ import Toast from '@/components/Toast';
 import CertificateModal from '@/components/CertificateModal';
 import ProcessingOverlay from '@/components/ProcessingOverlay';
 import AuthModal from '@/components/AuthModal';
-import { onAuthStateChange, logout, generateUserWallet } from '@/lib/auth';
+import { onAuthStateChange, logout } from '@/lib/auth';
 import { UserProfile } from '@/types/user';
 
 function FileSummary({ icon, name, date, assetId }: {
@@ -2208,56 +2208,11 @@ export default function Home() {
               {settingsSection === 'wallet' && (
                 <div>
                   <h1 className="text-2xl font-bold text-workspace-text mb-4">Ownership Wallet</h1>
-                  <p className="text-workspace-muted mb-8">Your permanent proof of ownership on the blockchain</p>
+                  <p className="text-workspace-muted mb-8">Inspect the timestamp records for your digital assets</p>
 
-                  {/* Wallet Address Card */}
                   <div className="workspace-card p-6 mb-6">
-                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Your Wallet Address</h3>
-                    <div className="bg-workspace-field p-4 rounded-lg mb-4">
-                      <code className="text-sm font-mono text-workspace-text break-all">
-                        {userWallet?.address || 'No wallet generated yet'}
-                      </code>
-                    </div>
-                    {userWallet && (
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(userWallet.address);
-                          showToastMessage('📋 Wallet address copied!', 'success');
-                        }}
-                        className="workspace-action px-6 py-2 rounded-lg  transition-all"
-                      >
-                        📋 Copy Address
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Recovery Phrase Card */}
-                  <div className="workspace-card p-6 mb-6">
-                    <h3 className="text-xl font-semibold text-workspace-text mb-4">Recovery Phrase</h3>
-                    <div className="bg-workspace-highlight border-2 border-workspace-accent p-4 rounded-lg mb-4">
-                      <p className="text-workspace-accent font-semibold mb-2">⚠️ CRITICAL: Keep This Safe</p>
-                      <p className="text-workspace-text text-sm">
-                        Your 12-word recovery phrase is the ONLY way to prove ownership if BloomShield shuts down.
-                        Never share it with anyone.
-                      </p>
-                    </div>
-                    {userWallet && (
-                      <button
-                        onClick={() => {
-                          const confirmed = confirm(
-                            '⚠️ WARNING: Never share your recovery phrase with anyone!\n\n' +
-                            'Anyone with this phrase can claim ownership of all your protected work.\n\n' +
-                            'Click OK to view your recovery phrase.'
-                          );
-                          if (confirmed) {
-                            alert(`Your Recovery Phrase:\n\n${userWallet.seedPhrase}\n\nStore this safely offline!`);
-                          }
-                        }}
-                        className="bg-workspace-panel border-2 border-workspace-accent text-workspace-accent px-6 py-2 rounded-lg hover:bg-workspace-highlight transition-all"
-                      >
-                        🔑 View Recovery Phrase
-                      </button>
-                    )}
+                    <h3 className="text-lg font-semibold mb-3">Blockchain records</h3>
+                    <p className="text-sm text-workspace-muted">BloomShield submits timestamps through its service wallet. Your account does not include a personal cryptocurrency wallet or recovery phrase. Use each asset’s verified transaction link to inspect its timestamp.</p>
                   </div>
 
                   {/* Protected Assets Card */}
