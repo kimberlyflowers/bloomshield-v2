@@ -29,6 +29,9 @@ export async function POST(request: Request) {
     const response = await whopRequest(`/memberships/${event.data.id}`);
     if (!response.ok) throw new Error(`Whop membership lookup returned ${response.status}`);
     const membership = await response.json();
+    if (membership.id !== event.data.id || membership.account?.id !== process.env.WHOP_ACCOUNT_ID) {
+      throw new Error('Whop membership account mismatch');
+    }
     const tenant = membership.metadata?.bloomshield_tenant;
     const variant = membership.variant_id;
     const plan = variant === whopVariants.unlimited ? 'unlimited' : variant === whopVariants.pro ? 'pro' : null;

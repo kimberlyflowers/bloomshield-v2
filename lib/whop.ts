@@ -16,7 +16,7 @@ export async function whopRequest(path: string, options?: RequestInit) {
     headers: {
       Authorization: `Bearer ${process.env.WHOP_API_KEY}`,
       'Content-Type': 'application/json',
-      'Api-Version-Date': '2026-07-01',
+      'Api-Version-Date': '2026-11-06',
     },
     cache: 'no-store',
     signal: AbortSignal.timeout(4000),
