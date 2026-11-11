@@ -1092,10 +1092,10 @@ export default function Home() {
               <div className="w-full max-w-7xl mx-auto px-6 md:px-12 lg:px-16">
                 <div className="max-w-xl">
                   <h1 className="text-4xl md:text-5xl lg:text-[3.5rem] font-bold text-white leading-[1.15] mb-6" style={{ textShadow: '0 2px 30px rgba(0,0,0,0.4)' }}>
-                    Protect Your Creative Work in 60 Seconds
+                    Protect Your Creative Work
                   </h1>
                   <p className="text-base md:text-lg text-white/75 leading-relaxed max-w-md" style={{ textShadow: '0 1px 12px rgba(0,0,0,0.3)' }}>
-                    Blockchain verification trusted by 1,000+ creators.
+                    Save private originals and verify your digital assets with blockchain timestamps.
                   </p>
                 </div>
               </div>
